@@ -372,7 +372,7 @@ make skaffold-app APP=go-auth
 make skaffold-delete
 ```
 
-See [docs/SKAFFOLD_GUIDE.md](docs/SKAFFOLD_GUIDE.md) for detailed Skaffold usage.
+See the scripts directory for detailed Skaffold usage.
 
 ### Cleanup Operations
 
@@ -534,18 +534,7 @@ helm upgrade --install ttrpg-local charts/ttrpg-umbrella \
 
 ### Getting Help
 
-For more detailed troubleshooting, see:
-- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Comprehensive troubleshooting guide
-- [docs/VAULT_SETUP.md](docs/VAULT_SETUP.md) - Vault-specific issues
-- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) - Deployment scenarios
-
-## Documentation
-
-- **[VAULT_SETUP.md](docs/VAULT_SETUP.md)**: Vault initialization, unsealing, and configuration
-- **[DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)**: Deployment examples for all environments
-- **[PASSWORD_GENERATION.md](docs/PASSWORD_GENERATION.md)**: Unicode password policy details
-- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**: Common issues and solutions
-- **[SKAFFOLD_GUIDE.md](docs/SKAFFOLD_GUIDE.md)**: Local development with Skaffold
+For more detailed troubleshooting, check the Makefile targets and application logs.
 
 ## Project Structure
 
@@ -585,12 +574,6 @@ ttrpg-deployment/
 │   ├── backup-vault.sh
 │   ├── restore-vault.sh
 │   └── bootstrap-sealed-secrets.sh
-├── docs/                        # Documentation
-│   ├── VAULT_SETUP.md
-│   ├── DEPLOYMENT_GUIDE.md
-│   ├── PASSWORD_GENERATION.md
-│   ├── TROUBLESHOOTING.md
-│   └── SKAFFOLD_GUIDE.md
 ├── skaffold.yaml               # Skaffold configuration
 ├── Makefile                    # Automation targets
 └── README.md                   # This file
@@ -690,6 +673,5 @@ helm upgrade --install ttrpg-dev charts/ttrpg-umbrella \
 ## Support
 
 For issues and questions:
-- Check [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 - Review Helm chart documentation
 - Check application logs: `kubectl logs -n ttrpg-local deploy/<app-name>`
