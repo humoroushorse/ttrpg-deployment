@@ -1,0 +1,59 @@
+{{- if and .Values.ingress.enabled .Values.ingress.keycloak.enabled }}
+{{- if or .Values.routes.dndApi.enabled .Values.routes.dndUi.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ttrpg-ingress-dnd
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+    app.kubernetes.io/realm: dnd
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.issuer | default "selfsigned" }}
+    {{- end }}
+    # Set realm variable for D&D paths
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      set $realm "dnd";
+    # Keycloak authentication with dnd realm
+    nginx.ingress.kubernetes.io/auth-url: "{{ include "ingress.keycloakUrl" . }}/realms/dnd/protocol/openid-connect/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://{{ .Values.domain }}/ttrpg/auth/login?realm=dnd"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.domain }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          {{- if .Values.routes.dndApi.enabled }}
+          # D&D API with dnd realm authentication
+          - path: {{ .Values.routes.dndApi.path }}(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.dndApi.service }}
+                port:
+                  number: {{ .Values.routes.dndApi.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.dndUi.enabled }}
+          # D&D UI with dnd realm authentication
+          - path: {{ .Values.routes.dndUi.path }}(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.dndUi.service }}
+                port:
+                  number: {{ .Values.routes.dndUi.port }}
+          {{- end }}
+{{- end }}
+{{- end }}

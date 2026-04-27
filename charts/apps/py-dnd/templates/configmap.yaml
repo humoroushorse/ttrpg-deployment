@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "py-dnd.fullname" . }}
+  namespace: {{ include "py-dnd.namespace" . }}
+  labels:
+    {{- include "py-dnd.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  APP_NAME: "py-dnd"
+  APP_PORT: {{ .Values.service.port | quote }}
+  ENVIRONMENT: {{ .Values.environment | quote }}
+  # Database configuration (credentials come from Vault)
+  {{- $pgHost := .Values.global.postgresql.host | default "platform-postgresql.platform.svc.cluster.local" }}
+  {{- $pgPort := .Values.global.postgresql.port | default 5432 }}
+  # Master database connection
+  POSTGRES_MASTER_HOST: {{ $pgHost | quote }}
+  POSTGRES_MASTER_PORT: {{ $pgPort | quote }}
+  POSTGRES_MASTER_USER: "postgres"
+  POSTGRES_MASTER_PASSWORD: "TEMPORARY_PASSWORD_WILL_BE_ROTATED"
+  POSTGRES_MASTER_NAME: {{ .Values.database.name | quote }}
+  # Replica database connection (same as master for local dev)
+  POSTGRES_REPLICA_HOST: {{ $pgHost | quote }}
+  POSTGRES_REPLICA_PORT: {{ $pgPort | quote }}
+  POSTGRES_REPLICA_USER: "postgres"
+  POSTGRES_REPLICA_PASSWORD: "TEMPORARY_PASSWORD_WILL_BE_ROTATED"
+  POSTGRES_REPLICA_NAME: {{ .Values.database.name | quote }}
+  # NATS configuration
+  NATS_URL: {{ .Values.global.nats.url | default "nats://platform-nats-client.platform.svc.cluster.local:4222" | quote }}
+  # Keycloak configuration
+  KEYCLOAK_SERVER_URL: "http://platform-keycloak.platform.svc.cluster.local:8080"
+  KEYCLOAK_REALM_NAME: "dnd"
+  KEYCLOAK_CLIENT_ID: "dnd-client"
+  KEYCLOAK_ADMIN_USERNAME: "admin"
+  KEYCLOAK_ADMIN_PASSWORD: "admin"
+  # Logging configuration
+  {{- include "py-dnd.loggingConfig" . | nindent 2 }}

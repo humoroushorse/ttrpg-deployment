@@ -1,0 +1,39 @@
+{{- if .Values.enabled }}
+Keycloak has been deployed!
+
+Environment: {{ .Values.environment }}
+Namespace: {{ include "keycloak.namespace" . }}
+Service: {{ include "keycloak.fullname" . }}
+Replicas: {{ .Values.replicaCount }}
+
+To check the status of Keycloak:
+
+  kubectl get pods -n {{ include "keycloak.namespace" . }} -l app.kubernetes.io/name=keycloak
+
+To view logs:
+
+  kubectl logs -n {{ include "keycloak.namespace" . }} -l app.kubernetes.io/name=keycloak -f
+
+To access Keycloak admin console locally:
+
+  kubectl port-forward -n {{ include "keycloak.namespace" . }} svc/{{ include "keycloak.fullname" . }} 8180:8080
+
+  Then open: http://localhost:8180
+
+To configure realms and clients, run:
+
+  export ENV={{ .Values.environment }}
+  export DOMAIN={{ .Values.keycloak.hostname }}
+  ./scripts/setup-keycloak.sh
+
+Keycloak will be accessible at:
+  - Internal: http://{{ include "keycloak.fullname" . }}.{{ include "keycloak.namespace" . }}.svc.cluster.local:{{ .Values.service.port }}
+  - External: https://{{ .Values.keycloak.hostname }}/
+
+Realms to be configured:
+  - dnd (for D&D application)
+  - sprint-management (for Sprint Management application)
+
+{{- else }}
+Keycloak is disabled. To enable it, set enabled=true in values.yaml
+{{- end }}

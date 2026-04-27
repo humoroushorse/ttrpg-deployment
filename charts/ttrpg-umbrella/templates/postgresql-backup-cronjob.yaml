@@ -1,0 +1,113 @@
+{{- if and .Values.backups.enabled .Values.postgresql.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgresql-backup
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: postgresql-backup
+    environment: {{ .Values.environment }}
+spec:
+  schedule: {{ .Values.backups.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgresql-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: postgresql-backup
+          containers:
+          - name: backup
+            image: postgres:18-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backups/${TIMESTAMP}"
+              mkdir -p "${BACKUP_DIR}"
+              
+              # Backup each database
+              for DB in auth sprint_management dnd keycloak; do
+                echo "Backing up database: ${DB}"
+                pg_dump -h postgresql.ttrpg-{{ .Values.environment }}.svc.cluster.local \
+                  -U "${POSTGRES_USER}" \
+                  -d "${DB}" \
+                  -F c \
+                  -f "${BACKUP_DIR}/${DB}.dump"
+                
+                if [ $? -eq 0 ]; then
+                  echo "Successfully backed up ${DB}"
+                else
+                  echo "Failed to backup ${DB}"
+                  exit 1
+                fi
+              done
+              
+              # Create metadata file
+              cat > "${BACKUP_DIR}/metadata.json" <<EOF
+              {
+                "timestamp": "${TIMESTAMP}",
+                "environment": "{{ .Values.environment }}",
+                "databases": ["auth", "sprint_management", "dnd", "keycloak"],
+                "retention_days": {{ .Values.backups.retention }}
+              }
+              EOF
+              
+              # Cleanup old backups
+              echo "Cleaning up backups older than {{ .Values.backups.retention }} days"
+              find /backups -maxdepth 1 -type d -mtime +{{ .Values.backups.retention }} -exec rm -rf {} \;
+              
+              echo "Backup completed successfully"
+            env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-backup-creds
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-backup-creds
+                  key: password
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: postgresql-backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-backups
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: postgresql-backup
+    environment: {{ .Values.environment }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.backups.storage | default "50Gi" }}
+  {{- if .Values.backups.storageClass }}
+  storageClassName: {{ .Values.backups.storageClass }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgresql-backup
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: postgresql-backup
+    environment: {{ .Values.environment }}
+{{- end }}

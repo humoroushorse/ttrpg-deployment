@@ -1,0 +1,19 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller-admission
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  type: ClusterIP
+  ports:
+    - name: https-webhook
+      port: 443
+      targetPort: webhook
+      protocol: TCP
+  selector:
+    {{- include "ingress.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -1,0 +1,381 @@
+# Production environment overrides
+# HA configuration, multiple replicas, full monitoring
+
+global:
+  # Pinned version for production stability and reproducibility
+  # Update this version when deploying new releases to production
+  # Always use semantic versioning (e.g., v1.2.3)
+  version: "v1.0.0"
+  postgresql:
+    mode: "operator"
+
+environment: "prod"
+domain: "mysite.com"
+
+# Vault - HA with Raft storage
+vault:
+  enabled: true
+  replicas: 3  # HA with leader election
+  storage: "50Gi"
+  autoUnseal: false
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  raft:
+    enabled: true
+    setNodeId: true
+
+# Cloudflare Tunnel - enabled for external access
+cloudflare:
+  enabled: true
+  tunnelId: ""  # Set via sealed secret
+  domain: "mysite.com"
+  ingressEndpoint: ""  # Auto-detected
+  replicas: 3  # HA
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+# PostgreSQL - HA with operator
+postgresql:
+  enabled: true
+  mode: "operator"  # Use PostgreSQL Operator for HA
+  storage: "100Gi"
+  replicas: 3  # Primary + 2 replicas
+  operator:
+    type: "zalando"
+    enableConnectionPooler: true
+    enableReplicaConnectionPooler: true
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "4000m"
+      memory: "8Gi"
+
+# Keycloak - HA with multiple replicas
+keycloak:
+  enabled: true
+  replicas: 2
+  hostname: "mysite.com"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  realms:
+    - name: dnd
+      clients:
+        - clientId: dnd-client
+          publicClient: true
+          redirectUris:
+            - "https://mysite.com/ttrpg/dnd/*"
+    - name: sprint-management
+      clients:
+        - clientId: sprint-client
+          publicClient: true
+          redirectUris:
+            - "https://mysite.com/ttrpg/sprint-management/*"
+
+# NATS - HA cluster
+nats:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+  jetstream:
+    enabled: true
+    storage: "20Gi"
+
+# Applications - production resources, multiple replicas
+go-auth:
+  enabled: true
+  replicaCount: 3
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "512Mi"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+go-sprint:
+  enabled: true
+  replicaCount: 3
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "512Mi"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+py-dnd:
+  enabled: true
+  replicaCount: 3
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+ui-dnd:
+  enabled: true
+  replicaCount: 2
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+ui-sprint-management:
+  enabled: true
+  replicaCount: 2
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Ingress - ClusterIP with Cloudflare Tunnel, TLS enabled
+ingress:
+  enabled: true
+  className: "nginx"
+  controller:
+    service:
+      type: ClusterIP  # Cloudflare Tunnel as origin
+    replicaCount: 3  # HA
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+  tls:
+    enabled: true
+    secretName: "ttrpg-tls"
+  keycloak:
+    enabled: true  # Enable Keycloak authentication
+
+# Resource Quotas - production limits
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "16"
+    requests.memory: "32Gi"
+    limits.cpu: "32"
+    limits.memory: "64Gi"
+    persistentvolumeclaims: "20"
+
+# Limit Ranges
+limitRange:
+  enabled: true
+  defaults:
+    cpu: "200m"
+    memory: "256Mi"
+  defaultRequests:
+    cpu: "100m"
+    memory: "128Mi"
+  max:
+    cpu: "4000m"
+    memory: "8Gi"
+  min:
+    cpu: "50m"
+    memory: "64Mi"
+
+# Pod Disruption Budgets - ensure availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2  # At least 2 pods must be available
+
+# Horizontal Pod Autoscaler - enabled
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Monitoring - full stack enabled
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    scrapeInterval: "30s"
+    scrapeTimeout: "10s"
+    instance: "kube-prometheus"
+  grafana:
+    enabled: true
+    namespace: "monitoring"
+    dashboards:
+      applicationHealth: true
+      databasePerformance: true
+      vaultAccess: true
+      ingressTraffic: true
+
+# Logging - structured JSON logging with WARN level
+logging:
+  format: "json"
+  level:
+    prod: "WARN"
+  structuredLogging:
+    enabled: true
+    includeTimestamp: true
+    includeLevel: true
+    includeService: true
+    includeEnvironment: true
+    includeTraceId: true
+
+# Backups - enabled with 30 day retention
+backups:
+  enabled: true
+  schedule: "0 2 * * *"  # 2 AM daily
+  retention: 30
+  storage: "200Gi"
+  storageClass: "fast-ssd"
+  destinations:
+    - type: "pvc"
+      name: "backup-storage"
+    - type: "s3"
+      bucket: "ttrpg-prod-backups"
+      region: "us-east-1"
+  vault:
+    enabled: true
+    schedule: "0 */6 * * *"  # Every 6 hours
+    retention: 30
+    encryption:
+      enabled: true
+      gpgRecipient: "vault-backup@ttrpg.local"
+
+# Network Policies - strict isolation
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Certificate Manager - Let's Encrypt production
+cert-manager:
+  enabled: true
+  email: "ops@mysite.com"
+  issuer: "letsencrypt-prod"
+
+# Pod Security Standards - restricted
+podSecurity:
+  enabled: true
+  applicationStandard: "restricted"
+  infrastructureStandard: "baseline"
+
+# Sealed Secrets
+sealedSecrets:
+  enabled: true
+
+# GitHub Runner - optional for self-hosted CI/CD
+githubRunner:
+  enabled: false
+  replicas: 2

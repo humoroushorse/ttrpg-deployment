@@ -1,0 +1,102 @@
+{{- if .Values.migration.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "py-dnd.fullname" . }}-migration
+  namespace: {{ include "py-dnd.namespace" . }}
+  labels:
+    {{- include "py-dnd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished | default 86400 }}
+  template:
+    metadata:
+      labels:
+        {{- include "py-dnd.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+      annotations:
+        # Migrations use static credentials (superuser) for DDL operations.
+        # Vault dynamic credentials lack schema-level permissions needed for CREATE TABLE etc.
+        vault.hashicorp.com/agent-inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "py-dnd.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: false
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: migration
+        image: "{{ .Values.migration.image.repository }}:{{ .Values.migration.image.tag | default (include "py-dnd.imageTag" .) }}"
+        imagePullPolicy: {{ .Values.migration.image.pullPolicy | default .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # URL-encode credentials (passwords may contain special chars)
+            export POSTGRES_MASTER_USER=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_MASTER_USER','postgres'), safe=''))")
+            export POSTGRES_MASTER_PASSWORD=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_MASTER_PASSWORD','admin'), safe=''))")
+
+            # Run Alembic migrations
+            echo "Running Alembic migrations..."
+            cd /code
+            alembic upgrade head
+            
+            # Verify migration success
+            echo "Verifying migration status..."
+            alembic current
+        env:
+        - name: POSTGRES_MASTER_HOST
+          value: {{ .Values.migration.database.host | default (.Values.global.postgresql.host | default "platform-postgresql.platform.svc.cluster.local") | quote }}
+        - name: POSTGRES_MASTER_PORT
+          value: {{ .Values.migration.database.port | default "5432" | quote }}
+        - name: POSTGRES_MASTER_NAME
+          value: {{ .Values.migration.database.name | default .Values.database.name | quote }}
+        - name: POSTGRES_MASTER_USER
+          value: {{ .Values.migration.database.user | default "postgres" | quote }}
+        - name: POSTGRES_MASTER_PASSWORD
+          value: {{ .Values.migration.database.password | default "TEMPORARY_PASSWORD_WILL_BE_ROTATED" | quote }}
+        # Keycloak settings required by py-dnd Settings class
+        - name: KEYCLOAK_SERVER_URL
+          value: "http://platform-keycloak.platform.svc.cluster.local:8080"
+        - name: KEYCLOAK_REALM_NAME
+          value: "dnd"
+        - name: KEYCLOAK_CLIENT_ID
+          value: "dnd-client"
+        - name: KEYCLOAK_ADMIN_USERNAME
+          value: "admin"
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          value: "admin"
+        {{- with .Values.migration.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Alembic may need to write temporary files
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: alembic-cache
+          mountPath: /app/.alembic
+        {{- with .Values.migration.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.migration.resources | nindent 10 }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: alembic-cache
+        emptyDir: {}
+      {{- with .Values.migration.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+apiVersion: v2
+name: vault-release
+description: HashiCorp Vault deployment for TTRPG platform
+type: application
+version: 1.0.0
+appVersion: "1.15.0"
+
+dependencies:
+  - name: vault
+    version: "0.28.0"
+    repository: "https://helm.releases.hashicorp.com"

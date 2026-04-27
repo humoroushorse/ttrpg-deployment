@@ -1,0 +1,103 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ingress.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ingress.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: ingress-nginx
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.controller.securityContext.runAsUser }}
+        fsGroup: {{ .Values.controller.securityContext.fsGroup }}
+        seccompProfile:
+          type: {{ .Values.controller.securityContext.seccompProfile.type }}
+      containers:
+      - name: controller
+        image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+        imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+        args:
+          - /nginx-ingress-controller
+          - --election-id=ingress-nginx-leader
+          - --controller-class=k8s.io/ingress-nginx
+          - --ingress-class=nginx
+          - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
+          - --validating-webhook=:8443
+          - --validating-webhook-certificate=/usr/local/certificates/cert
+          - --validating-webhook-key=/usr/local/certificates/key
+          - --watch-ingress-without-class=false
+          - --publish-status-address=localhost
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: LD_PRELOAD
+            value: /usr/local/lib/libmimalloc.so
+        ports:
+          - name: http
+            containerPort: 80
+            protocol: TCP
+          - name: https
+            containerPort: 443
+            protocol: TCP
+          - name: webhook
+            containerPort: 8443
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.controller.resources | nindent 10 }}
+        securityContext:
+          runAsNonRoot: {{ .Values.controller.securityContext.runAsNonRoot }}
+          runAsUser: {{ .Values.controller.securityContext.runAsUser }}
+          allowPrivilegeEscalation: {{ .Values.controller.securityContext.allowPrivilegeEscalation }}
+          capabilities:
+            drop:
+              {{- toYaml .Values.controller.securityContext.capabilities.drop | nindent 14 }}
+            add:
+              {{- toYaml .Values.controller.securityContext.capabilities.add | nindent 14 }}
+          seccompProfile:
+            type: {{ .Values.controller.securityContext.seccompProfile.type }}
+        volumeMounts:
+          - name: webhook-cert
+            mountPath: /usr/local/certificates/
+            readOnly: true
+      volumes:
+        - name: webhook-cert
+          secret:
+            secretName: ingress-nginx-admission
+{{- end }}

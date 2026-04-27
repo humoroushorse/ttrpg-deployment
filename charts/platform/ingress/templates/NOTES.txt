@@ -1,0 +1,94 @@
+{{- if .Values.controller.enabled }}
+Nginx Ingress Controller has been deployed!
+
+Environment: {{ .Values.environment }}
+Namespace: {{ include "ingress.namespace" . }}
+Service Type: {{ .Values.controller.service.type }}
+
+{{- if eq .Values.controller.service.type "LoadBalancer" }}
+
+To access your applications, wait for the LoadBalancer to be assigned an external IP:
+
+  kubectl get service ingress-nginx-controller -n {{ include "ingress.namespace" . }}
+
+Once the EXTERNAL-IP is available, you can access:
+
+  Auth Service:              http://<EXTERNAL-IP>/ttrpg/auth/health
+  D&D UI:                    http://<EXTERNAL-IP>/ttrpg/dnd/
+  D&D API:                   http://<EXTERNAL-IP>/ttrpg/dnd/api/v1/
+  Sprint Management UI:      http://<EXTERNAL-IP>/ttrpg/sprint-management/
+  Sprint Management API:     http://<EXTERNAL-IP>/ttrpg/sprint-management/api/v1/
+
+For local development with k3d, the LoadBalancer should be available at localhost:8080
+
+{{- else }}
+
+The ingress controller is running as ClusterIP. Access is via:
+{{- if .Values.cloudflare.enabled }}
+  - Cloudflare Tunnel: https://{{ .Values.domain }}
+{{- else }}
+  - Port forwarding: kubectl port-forward -n {{ include "ingress.namespace" . }} svc/ingress-nginx-controller 8080:80
+{{- end }}
+
+Application URLs:
+  Auth Service:              https://{{ .Values.domain }}/ttrpg/auth/health
+  D&D UI:                    https://{{ .Values.domain }}/ttrpg/dnd/
+  D&D API:                   https://{{ .Values.domain }}/ttrpg/dnd/api/v1/
+  Sprint Management UI:      https://{{ .Values.domain }}/ttrpg/sprint-management/
+  Sprint Management API:     https://{{ .Values.domain }}/ttrpg/sprint-management/api/v1/
+
+{{- end }}
+
+{{- if .Values.ingress.keycloak.enabled }}
+
+Keycloak Authentication is ENABLED:
+  - D&D paths use the "dnd" realm
+  - Sprint Management paths use the "sprint-management" realm
+  - Auth paths bypass authentication
+
+To test authenticated endpoints, you need a valid token from Keycloak.
+
+{{- else }}
+
+Keycloak Authentication is DISABLED (local development mode)
+All endpoints are accessible without authentication.
+
+{{- end }}
+
+{{- if .Values.ingress.tls.enabled }}
+
+TLS is ENABLED:
+  Certificate Secret: {{ .Values.ingress.tls.secretName }}
+  Issuer: {{ .Values.certManager.issuer | default "selfsigned" }}
+
+Check certificate status:
+  kubectl get certificate -n {{ include "ingress.namespace" . }}
+
+{{- else }}
+
+TLS is DISABLED (local development mode)
+All traffic is unencrypted HTTP.
+
+{{- end }}
+
+Useful Commands:
+
+  # Check ingress controller status
+  kubectl get pods -n {{ include "ingress.namespace" . }} -l app.kubernetes.io/component=ingress-controller
+
+  # View controller logs
+  kubectl logs -n {{ include "ingress.namespace" . }} deployment/ingress-nginx-controller -f
+
+  # Check ingress resources
+  kubectl get ingress -n {{ include "ingress.namespace" . }}
+
+  # Describe ingress for routing details
+  kubectl describe ingress ttrpg-ingress -n {{ include "ingress.namespace" . }}
+
+  # Test routing
+  curl http://{{ if eq .Values.controller.service.type "LoadBalancer" }}localhost:8080{{ else }}{{ .Values.domain }}{{ end }}/ttrpg/auth/health
+
+For more information, see the chart README:
+  charts/ttrpg-umbrella/charts/ingress/README.md
+
+{{- end }}

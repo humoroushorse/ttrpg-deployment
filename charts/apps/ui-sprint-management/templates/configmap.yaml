@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ui-sprint-management.fullname" . }}
+  namespace: {{ include "ui-sprint-management.namespace" . }}
+  labels:
+    {{- include "ui-sprint-management.labels" . | nindent 4 }}
+data:
+  # Nginx configuration
+  default.conf: |
+    resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+
+    server {
+        listen 4200;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Serve under /ttrpg/sprint-management/ subpath (matches base-href)
+        location /ttrpg/sprint-management/ {
+            alias /usr/share/nginx/html/;
+            try_files $uri $uri/ /ttrpg/sprint-management/index.html;
+        }
+
+        # Fallback for root access (direct port-forward)
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # API proxy to go-sprint (use variable for lazy DNS resolution)
+        location /api/v1/ {
+            set $backend "http://{{ .Release.Name }}-go-sprint.{{ include "ui-sprint-management.namespace" . }}.svc.cluster.local:8003";
+            proxy_pass $backend/api/v1/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+  # Application runtime configuration
+  app.config.json: |
+    {
+      "apiBasePath": "/api/v1",
+      "spellApiBasePath": "/api/v1"
+    }

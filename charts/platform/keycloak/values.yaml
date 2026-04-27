@@ -1,0 +1,93 @@
+# Default values for keycloak chart
+
+# Global values (inherited from parent chart)
+global:
+  version: "latest"
+
+# Environment (local, dev, prod)
+environment: "local"
+
+# Enable/disable this chart
+enabled: true
+
+# Replica count
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: keycloak/keycloak
+  pullPolicy: IfNotPresent
+  tag: "26.5"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Database configuration
+database:
+  name: keycloak
+  host: ""  # Auto-detected if empty: postgresql.ttrpg-{env}.svc.cluster.local
+
+# Keycloak configuration
+keycloak:
+  # Hostname for Keycloak (used in URLs)
+  hostname: "localhost"
+  
+  # HTTP settings
+  httpEnabled: true
+  httpPort: 8080
+  
+  # Proxy settings (for use behind ingress)
+  proxy: edge
+  
+  # Admin console settings
+  adminConsole:
+    enabled: true
+
+# Resource limits
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+# Health check configuration
+# Health check configuration - temporarily disabled
+livenessProbe: null
+readinessProbe: null
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Keycloak needs writable filesystem
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

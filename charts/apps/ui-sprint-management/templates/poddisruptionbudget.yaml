@@ -1,0 +1,18 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ui-sprint-management.fullname" . }}
+  namespace: {{ include "ui-sprint-management.namespace" . }}
+  labels:
+    {{- include "ui-sprint-management.labels" . | nindent 4 }}
+spec:
+  {{- if eq (.Values.replicaCount | int) 1 }}
+  minAvailable: 1
+  {{- else }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable | default "50%" }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ui-sprint-management.selectorLabels" . | nindent 6 }}
+{{- end }}

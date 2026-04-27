@@ -1,0 +1,78 @@
+apiVersion: v2
+name: ttrpg-umbrella
+description: Umbrella Helm chart for TTRPG application suite with Vault integration
+type: application
+
+# Chart version - this is the version of the Helm chart itself
+# This version is independent of application versions
+# Increment this when making changes to chart templates, values schema, or dependencies
+# Follow semantic versioning: MAJOR.MINOR.PATCH
+# - MAJOR: Breaking changes to chart structure or values schema
+# - MINOR: New features, new subcharts, backward-compatible changes
+# - PATCH: Bug fixes, documentation updates
+version: 0.1.0
+
+# Application version - default version for applications if not specified
+# This is a metadata field and does NOT control actual deployment versions
+# Use global.version in values.yaml to control application versions
+appVersion: "1.0.0"
+keywords:
+  - ttrpg
+  - microservices
+  - vault
+  - kubernetes
+maintainers:
+  - name: TTRPG Team
+home: https://github.com/your-org/ttrpg-deployment
+sources:
+  - https://github.com/your-org/ttrpg-api
+  - https://github.com/your-org/ttrpg-ui
+dependencies:
+  - name: sealed-secrets
+    version: "0.1.0"
+    repository: "file://./charts/sealed-secrets"
+    condition: sealedSecrets.enabled
+  - name: cert-manager
+    version: "0.1.0"
+    repository: "file://./charts/cert-manager"
+    condition: certManager.enabled
+  - name: postgresql
+    version: "0.1.0"
+    repository: "file://./charts/postgresql"
+    condition: postgresql.enabled
+  - name: keycloak
+    version: "0.1.0"
+    repository: "file://./charts/keycloak"
+    condition: keycloak.enabled
+  - name: nats
+    version: "0.1.0"
+    repository: "file://./charts/nats"
+    condition: nats.enabled
+  - name: ingress
+    version: "0.1.0"
+    repository: "file://./charts/ingress"
+    condition: ingress.enabled
+  - name: cloudflare-tunnel
+    version: "0.1.0"
+    repository: "file://./charts/cloudflare-tunnel"
+    condition: cloudflare.enabled
+  - name: go-auth
+    version: "0.1.0"
+    repository: "file://./charts/go-auth"
+    condition: go-auth.enabled
+  - name: go-sprint
+    version: "0.1.0"
+    repository: "file://./charts/go-sprint"
+    condition: go-sprint.enabled
+  - name: py-dnd
+    version: "0.1.0"
+    repository: "file://./charts/py-dnd"
+    condition: py-dnd.enabled
+  - name: ui-dnd
+    version: "0.1.0"
+    repository: "file://./charts/ui-dnd"
+    condition: ui-dnd.enabled
+  - name: ui-sprint-management
+    version: "0.1.0"
+    repository: "file://./charts/ui-sprint-management"
+    condition: ui-sprint-management.enabled

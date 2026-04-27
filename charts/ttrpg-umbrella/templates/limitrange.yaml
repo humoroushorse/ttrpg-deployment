@@ -1,0 +1,29 @@
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "ttrpg-umbrella.fullname" . }}-limits
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    {{- include "ttrpg-umbrella.labels" . | nindent 4 }}
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: {{ .Values.limitRange.defaults.cpu }}
+      memory: {{ .Values.limitRange.defaults.memory }}
+    defaultRequest:
+      cpu: {{ .Values.limitRange.defaultRequests.cpu }}
+      memory: {{ .Values.limitRange.defaultRequests.memory }}
+    max:
+      cpu: {{ .Values.limitRange.max.cpu }}
+      memory: {{ .Values.limitRange.max.memory }}
+    min:
+      cpu: {{ .Values.limitRange.min.cpu }}
+      memory: {{ .Values.limitRange.min.memory }}
+  - type: PersistentVolumeClaim
+    max:
+      storage: {{ .Values.limitRange.max.storage | default "100Gi" }}
+    min:
+      storage: {{ .Values.limitRange.min.storage | default "1Gi" }}
+{{- end }}

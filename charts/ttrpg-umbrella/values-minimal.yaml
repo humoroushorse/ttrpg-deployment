@@ -1,0 +1,79 @@
+# Minimal deployment - just infrastructure + sprint management
+
+global:
+  version: "latest"
+  environment: "local"
+
+# Disable vault
+vault:
+  enabled: true
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgres"
+    database: "ttrpg"
+  primary:
+    persistence:
+      enabled: false
+
+# NATS
+nats:
+  enabled: true
+
+# Keycloak
+keycloak:
+  enabled: true
+  auth:
+    adminUser: admin
+    adminPassword: admin
+  postgresql:
+    enabled: false
+  externalDatabase:
+    host: ttrpg-local-postgresql
+    port: 5432
+    user: postgres
+    password: postgres
+    database: keycloak
+
+# Disable all apps except sprint management
+go-auth:
+  enabled: false
+
+go-sprint:
+  enabled: false
+
+py-dnd:
+  enabled: false
+
+ui-dnd:
+  enabled: false
+
+ui-sprint-management:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/ui-sprint-management"
+    pullPolicy: "IfNotPresent"
+  resources:
+    # Conservative limits for single-user or small team usage (1-3 users)
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  # Probes disabled for minimal resource usage in local development
+  livenessProbe: null
+  readinessProbe: null
+
+# Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  controller:
+    service:
+      type: LoadBalancer
+  tls:
+    enabled: false

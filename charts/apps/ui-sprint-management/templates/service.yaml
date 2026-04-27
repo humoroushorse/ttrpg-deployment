@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ui-sprint-management.fullname" . }}
+  namespace: {{ include "ui-sprint-management.namespace" . }}
+  labels:
+    {{- include "ui-sprint-management.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort | default .Values.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ui-sprint-management.selectorLabels" . | nindent 4 }}

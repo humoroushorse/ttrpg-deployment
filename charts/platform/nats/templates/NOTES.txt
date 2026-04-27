@@ -1,0 +1,30 @@
+{{- if .Values.enabled }}
+NATS has been deployed!
+
+1. Get the NATS client connection URL:
+
+   NATS_URL=nats://{{ include "nats.fullname" . }}-client.{{ include "nats.namespace" . }}.svc.cluster.local:{{ .Values.service.ports.client }}
+
+2. Applications can connect to NATS using:
+
+   nats.{{ include "nats.namespace" . }}.svc.cluster.local:{{ .Values.service.ports.client }}
+
+3. Monitor NATS server health:
+
+   kubectl port-forward -n {{ include "nats.namespace" . }} svc/{{ include "nats.fullname" . }}-client {{ .Values.service.ports.monitor }}:{{ .Values.service.ports.monitor }}
+   
+   Then visit: http://localhost:{{ .Values.service.ports.monitor }}/healthz
+
+4. View NATS monitoring dashboard:
+
+   Visit: http://localhost:{{ .Values.service.ports.monitor }}/
+
+{{- if .Values.nats.jetstream.enabled }}
+
+5. JetStream is enabled with:
+   - Max Memory: {{ .Values.nats.jetstream.maxMemory }}
+   - Max Storage: {{ .Values.nats.jetstream.maxStorage }}
+{{- end }}
+
+For more information, visit: https://docs.nats.io/
+{{- end }}

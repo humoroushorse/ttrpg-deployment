@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "go-sprint.fullname" . }}
+  namespace: {{ include "go-sprint.namespace" . }}
+  labels:
+    {{- include "go-sprint.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "go-sprint.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "go-sprint.vaultAnnotations" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "go-sprint.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "go-sprint.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ include "go-sprint.imageTag" . }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Source Vault secrets if available
+            if [ -f /vault/secrets/database ]; then
+              source /vault/secrets/database
+            fi
+
+            # URL-encode a string (handles special chars in Vault passwords)
+            urlencode() {
+              local string="$1"
+              local encoded=""
+              local i c o
+              for i in $(seq 0 $((${#string} - 1))); do
+                c="${string:$i:1}"
+                case "$c" in
+                  [a-zA-Z0-9.~_-]) encoded="${encoded}${c}" ;;
+                  *) o=$(printf '%%%02X' "'$c"); encoded="${encoded}${o}" ;;
+                esac
+              done
+              printf '%s' "$encoded"
+            }
+
+            # Build DATABASE URLs with URL-encoded credentials
+            ENCODED_USER=$(urlencode "${POSTGRES_USER:-postgres}")
+            ENCODED_PASS=$(urlencode "${POSTGRES_PASSWORD:-TEMPORARY_PASSWORD_WILL_BE_ROTATED}")
+            PG_HOST="${DATABASE_HOST:-platform-postgresql.platform.svc.cluster.local}"
+            PG_PORT="${DATABASE_PORT:-5432}"
+            PG_NAME="${DATABASE_NAME:-sprint_management}"
+            export DATABASE_MASTER_URL="postgres://${ENCODED_USER}:${ENCODED_PASS}@${PG_HOST}:${PG_PORT}/${PG_NAME}?sslmode=disable"
+            export DATABASE_REPLICA_URL="postgres://${ENCODED_USER}:${ENCODED_PASS}@${PG_HOST}:${PG_PORT}/${PG_NAME}?sslmode=disable"
+
+            exec /app/{{ .Values.appBinary }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: {{ include "go-sprint.fullname" . }}
+        {{- with .Values.env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        {{- with .Values.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      {{- with .Values.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,89 @@
+# Default values for ui-sprint-management
+# This is a YAML-formatted file.
+
+# Global values (inherited from parent chart)
+global:
+  version: "latest"
+
+# Environment: local, dev, or prod
+environment: "local"
+
+# Application version (overrides global.version if set)
+version: ""
+
+# Number of replicas
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: "ghcr.io/your-org/ui-sprint-management"
+  pullPolicy: "IfNotPresent"
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+# Pod security context (nginx user)
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 4204
+  targetPort: 4204
+
+# Health check configuration (frontends typically check root path)
+# Health check configuration - temporarily disabled
+livenessProbe: null
+readinessProbe: null
+
+# Resource limits and requests (lower for frontend)
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+env: []
+volumes: []
+volumeMounts: []
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: "50%"
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80

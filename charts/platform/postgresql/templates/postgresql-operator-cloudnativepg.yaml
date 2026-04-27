@@ -1,0 +1,74 @@
+{{- if and .Values.enabled (eq .Values.mode "operator") (eq .Values.operator.type "cloudnativepg") }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  namespace: {{ include "postgresql.namespace" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.operator.cloudnativepg.instances }}
+  
+  imageName: ghcr.io/cloudnative-pg/postgresql:18
+  
+  postgresql:
+    parameters:
+      {{- toYaml .Values.operator.cloudnativepg.postgresql.parameters | nindent 6 }}
+    pg_hba:
+    - hostssl all all 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
+  
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      encoding: UTF8
+      localeCollate: en_US.UTF-8
+      localeCType: en_US.UTF-8
+      postInitSQL:
+        {{- range .Values.databases }}
+        - CREATE DATABASE {{ . }};
+        {{- end }}
+        - CREATE USER {{ $.Values.vaultAdmin.username }} WITH SUPERUSER CREATEDB CREATEROLE REPLICATION;
+        {{- range .Values.databases }}
+        - GRANT ALL PRIVILEGES ON DATABASE {{ . }} TO {{ $.Values.vaultAdmin.username }};
+        {{- end }}
+  
+  storage:
+    size: {{ .Values.operator.cloudnativepg.storage.size }}
+  
+  resources:
+    {{- toYaml .Values.operator.cloudnativepg.resources | nindent 4 }}
+  
+  # High availability configuration
+  primaryUpdateStrategy: unsupervised
+  
+  # Connection pooling with PgBouncer
+  enablePgBouncer: true
+  pgBouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "25"
+  
+  # Monitoring
+  monitoring:
+    enabled: true
+    podMonitorEnabled: true
+  
+  # Backup configuration
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://postgresql-backups/{{ include "postgresql.fullname" . }}
+      s3Credentials:
+        accessKeyId:
+          name: backup-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: backup-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+        encryption: AES256
+    retentionPolicy: "30d"
+{{- end }}

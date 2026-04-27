@@ -1,0 +1,54 @@
+{{- if and .Values.enabled (eq .Values.mode "operator") (eq .Values.operator.type "zalando") }}
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  namespace: {{ include "postgresql.namespace" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  teamId: {{ .Values.operator.zalando.teamId }}
+  volume:
+    size: {{ .Values.operator.zalando.volume.size }}
+  numberOfInstances: {{ .Values.operator.zalando.numberOfInstances }}
+  
+  users:
+    {{ .Values.vaultAdmin.username }}:
+    - superuser
+    - createdb
+    - createrole
+  
+  databases:
+    {{- range .Values.databases }}
+    {{ . }}: {{ $.Values.vaultAdmin.username }}
+    {{- end }}
+  
+  postgresql:
+    version: {{ .Values.operator.zalando.postgresql.version | quote }}
+    parameters:
+      {{- toYaml .Values.operator.zalando.postgresql.parameters | nindent 6 }}
+  
+  resources:
+    {{- toYaml .Values.operator.zalando.resources | nindent 4 }}
+  
+  patroni:
+    initdb:
+      encoding: "UTF8"
+      locale: "en_US.UTF-8"
+      data-checksums: "true"
+    pg_hba:
+    - hostssl all all 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
+  
+  {{- if .Values.operator.zalando.enableConnectionPooler }}
+  enableConnectionPooler: true
+  {{- end }}
+  
+  {{- if .Values.operator.zalando.enableReplicaConnectionPooler }}
+  enableReplicaConnectionPooler: true
+  {{- end }}
+  
+  # Enable logical backups
+  enableLogicalBackup: true
+  logicalBackupSchedule: "30 00 * * *"
+{{- end }}

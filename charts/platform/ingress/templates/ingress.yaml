@@ -1,0 +1,93 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ttrpg-ingress
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+  annotations:
+    # SSL redirect (disabled by default, enabled in prod)
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # NO rewrite-target - preserve full paths
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.issuer | default "selfsigned" }}
+    {{- end }}
+    {{- if .Values.ingress.keycloak.enabled }}
+    # Keycloak authentication - realm set per path via configuration-snippet
+    nginx.ingress.kubernetes.io/auth-url: "{{ include "ingress.keycloakUrl" . }}/realms/$realm/protocol/openid-connect/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://{{ .Values.domain }}/ttrpg/auth/login"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.domain }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          {{- if .Values.routes.auth.enabled }}
+          # Auth service
+          - path: {{ .Values.routes.auth.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.auth.service }}
+                port:
+                  number: {{ .Values.routes.auth.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.sprintApi.enabled }}
+          # Sprint Management API - must come before UI to match more specific path
+          - path: {{ .Values.routes.sprintApi.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.sprintApi.service }}
+                port:
+                  number: {{ .Values.routes.sprintApi.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.sprintUi.enabled }}
+          # Sprint Management UI
+          - path: {{ .Values.routes.sprintUi.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.sprintUi.service }}
+                port:
+                  number: {{ .Values.routes.sprintUi.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.dndApi.enabled }}
+          # D&D API - must come before UI to match more specific path
+          - path: {{ .Values.routes.dndApi.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.dndApi.service }}
+                port:
+                  number: {{ .Values.routes.dndApi.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.dndUi.enabled }}
+          # D&D UI
+          - path: {{ .Values.routes.dndUi.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.dndUi.service }}
+                port:
+                  number: {{ .Values.routes.dndUi.port }}
+          {{- end }}
+{{- end }}

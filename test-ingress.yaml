@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ttrpg-ingress
+  namespace: ttrpg-local
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /ttrpg/sprint-management
+            pathType: Prefix
+            backend:
+              service:
+                name: ttrpg-local-ui-sprint-management
+                port:
+                  number: 4204

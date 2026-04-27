@@ -1,0 +1,70 @@
+# ============================================================
+# SECRETS & CREDENTIALS — never commit these
+# ============================================================
+
+# Vault init output (contains unseal keys and root tokens)
+vault-init-keys.json
+vault-init-keys*.json
+vault-keys.json
+vault-keys*.json
+*-vault-keys.json
+unseal-keys.json
+
+# Sealed secrets private keys
+*.key
+*.pem
+*.p12
+*.pfx
+sealed-secrets-key*
+
+# Kubernetes secrets manifests with real values
+*-secret.yaml
+*-secrets.yaml
+# (use *-secret.yaml.example or sealed secrets instead)
+
+# Environment files with real values
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Cloudflare tunnel credentials
+*.json
+# Re-allow specific safe JSON files
+!config/*.json
+!charts/**/*.json
+!skaffold.yaml
+
+# Keycloak realm exports with real client secrets
+# (keycloak-realms.json is allowed if it contains no secrets)
+
+# ============================================================
+# GENERATED / LOCAL STATE
+# ============================================================
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Helm chart dependencies
+charts/*/charts/
+charts/**/Chart.lock
+
+# Skaffold cache
+.skaffold/
+
+# Test output
+tests/*.log
+tests/output/
+
+# ============================================================
+# OS / EDITOR
+# ============================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

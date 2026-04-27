@@ -1,0 +1,106 @@
+# Default values for nats chart
+
+# Global values (inherited from parent chart)
+global:
+  version: "latest"
+
+# Environment (local, dev, prod)
+environment: "local"
+
+# Enable/disable this chart
+enabled: true
+
+# Replica count
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: nats
+  pullPolicy: IfNotPresent
+  tag: "2.12-alpine"
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    client: 4222
+    monitor: 8222
+    cluster: 6222
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# NATS configuration
+nats:
+  # Cluster name
+  clusterName: "ttrpg-nats"
+  
+  # JetStream configuration
+  jetstream:
+    enabled: false
+    maxMemory: "1Gi"
+    maxStorage: "10Gi"
+
+# Resource limits
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+# Health check configuration
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8222
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8222
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Storage for JetStream (if enabled)
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

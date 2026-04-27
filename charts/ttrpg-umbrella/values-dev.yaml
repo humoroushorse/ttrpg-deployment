@@ -1,0 +1,298 @@
+# Development environment overrides
+# Moderate resources, Cloudflare Tunnel enabled
+
+global:
+  # Use "dev" or "latest" for development environment
+  # Can be overridden at deploy time with specific versions for testing
+  version: "dev"
+  postgresql:
+    mode: "statefulset"
+
+environment: "dev"
+domain: "dev.mysite.com"
+
+# Vault - sealed, manual unseal
+vault:
+  enabled: true
+  replicas: 1
+  storage: "20Gi"
+  autoUnseal: false
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  raft:
+    enabled: false
+
+# Cloudflare Tunnel - enabled for external access
+cloudflare:
+  enabled: true
+  tunnelId: ""  # Set via --set or sealed secret
+  domain: "dev.mysite.com"
+  ingressEndpoint: ""  # Auto-detected
+  replicas: 2
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# PostgreSQL - single instance with more storage
+postgresql:
+  enabled: true
+  mode: "statefulset"
+  storage: "20Gi"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# Keycloak - moderate resources
+keycloak:
+  enabled: true
+  replicas: 1
+  hostname: "dev.mysite.com"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  realms:
+    - name: dnd
+      clients:
+        - clientId: dnd-client
+          publicClient: true
+          redirectUris:
+            - "https://dev.mysite.com/ttrpg/dnd/*"
+    - name: sprint-management
+      clients:
+        - clientId: sprint-client
+          publicClient: true
+          redirectUris:
+            - "https://dev.mysite.com/ttrpg/sprint-management/*"
+
+# NATS - moderate resources
+nats:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  jetstream:
+    enabled: true
+    storage: "5Gi"
+
+# Applications - moderate resources, Always pull policy
+go-auth:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "256Mi"
+
+go-sprint:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "256Mi"
+
+py-dnd:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  migration:
+    enabled: true
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+ui-dnd:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+ui-sprint-management:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: "Always"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# Ingress - ClusterIP with Cloudflare Tunnel, TLS enabled
+ingress:
+  enabled: true
+  className: "nginx"
+  controller:
+    service:
+      type: ClusterIP  # Cloudflare Tunnel as origin
+    replicaCount: 2
+  tls:
+    enabled: true
+    secretName: "ttrpg-tls"
+  keycloak:
+    enabled: true  # Enable Keycloak authentication
+
+# Resource Quotas - moderate for dev
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+    persistentvolumeclaims: "10"
+
+# Limit Ranges
+limitRange:
+  enabled: true
+  defaults:
+    cpu: "100m"
+    memory: "128Mi"
+  defaultRequests:
+    cpu: "50m"
+    memory: "64Mi"
+  max:
+    cpu: "2000m"
+    memory: "4Gi"
+  min:
+    cpu: "10m"
+    memory: "16Mi"
+
+# Pod Disruption Budgets - basic protection
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Autoscaling - disabled for dev
+autoscaling:
+  enabled: false
+
+# Monitoring - optional for dev
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+    scrapeInterval: "30s"
+  grafana:
+    enabled: false
+    namespace: "monitoring"
+
+# Logging - structured JSON logging with INFO level
+logging:
+  format: "json"
+  level:
+    dev: "INFO"
+  structuredLogging:
+    enabled: true
+    includeTimestamp: true
+    includeLevel: true
+    includeService: true
+    includeEnvironment: true
+    includeTraceId: true
+
+# Backups - enabled with 7 day retention
+backups:
+  enabled: true
+  schedule: "0 3 * * *"  # 3 AM daily
+  retention: 7
+  storage: "50Gi"
+  storageClass: ""
+  vault:
+    enabled: true
+    schedule: "0 */12 * * *"  # Every 12 hours
+    retention: 7
+    encryption:
+      enabled: true
+      gpgRecipient: "vault-backup@ttrpg.local"
+
+# Network Policies - enabled for security testing
+networkPolicy:
+  enabled: true
+
+# Certificate Manager - Let's Encrypt staging
+cert-manager:
+  enabled: true
+  email: "devops@mysite.com"
+  issuer: "letsencrypt-staging"
+
+# Pod Security Standards - restricted
+podSecurity:
+  enabled: true
+  applicationStandard: "restricted"
+  infrastructureStandard: "baseline"
+
+# Sealed Secrets
+sealedSecrets:
+  enabled: true

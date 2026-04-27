@@ -1,0 +1,23 @@
+apiVersion: v2
+name: platform
+description: Platform infrastructure for TTRPG (PostgreSQL, Keycloak, NATS, Ingress)
+type: application
+version: 1.0.0
+
+dependencies:
+  - name: postgresql
+    version: "1.0.0"
+    repository: "file://postgresql"
+    condition: postgresql.enabled
+  - name: keycloak
+    version: "0.1.0"
+    repository: "file://keycloak"
+    condition: keycloak.enabled
+  - name: nats
+    version: "0.1.0"
+    repository: "file://nats"
+    condition: nats.enabled
+  - name: ingress
+    version: "1.0.0"
+    repository: "file://ingress"
+    condition: ingress.enabled

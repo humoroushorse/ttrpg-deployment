@@ -1,0 +1,136 @@
+{{- if .Values.monitoring.enabled }}
+{{- if .Values.monitoring.prometheus.enabled }}
+---
+# ServiceMonitor for go-auth
+{{- if index .Values "go-auth" "enabled" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: go-auth
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: go-auth
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: go-auth
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+---
+# ServiceMonitor for go-sprint
+{{- if index .Values "go-sprint" "enabled" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: go-sprint
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: go-sprint
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: go-sprint
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+---
+# ServiceMonitor for py-dnd
+{{- if index .Values "py-dnd" "enabled" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: py-dnd
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: py-dnd
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: py-dnd
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+---
+# ServiceMonitor for PostgreSQL
+{{- if .Values.postgresql.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgresql
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: postgresql
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: postgresql
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+---
+# ServiceMonitor for NATS
+{{- if .Values.nats.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nats
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: nats
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: nats
+  endpoints:
+  - port: monitor
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+---
+# ServiceMonitor for Keycloak
+{{- if .Values.keycloak.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keycloak
+  namespace: ttrpg-{{ .Values.environment }}
+  labels:
+    app: keycloak
+    environment: {{ .Values.environment }}
+    prometheus: {{ .Values.monitoring.prometheus.instance | default "kube-prometheus" }}
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: {{ .Values.monitoring.prometheus.scrapeInterval | default "30s" }}
+    scrapeTimeout: {{ .Values.monitoring.prometheus.scrapeTimeout | default "10s" }}
+{{- end }}
+{{- end }}
+{{- end }}

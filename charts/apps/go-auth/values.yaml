@@ -1,0 +1,165 @@
+# Default values for go-auth
+# This is a YAML-formatted file.
+
+# Global values (inherited from parent chart)
+global:
+  version: "latest"
+
+# Environment: local, dev, or prod
+environment: "local"
+
+# Application version (overrides global.version if set)
+version: ""
+
+# Number of replicas
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: "ghcr.io/your-org/go-auth"
+  pullPolicy: "IfNotPresent"
+  # Overrides the image tag whose default is the chart appVersion or version
+  tag: ""
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Name overrides
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8081
+  targetPort: 8081
+
+# Database configuration
+database:
+  name: "auth"
+
+# Keycloak configuration
+keycloak:
+  url: "http://platform-keycloak.platform.svc.cluster.local:8080"
+  defaultRealm: "sprint-management"
+  clientId: "sprint-management-ui"
+  clientSecret: ""
+  adminUser: "admin"
+  adminPass: "admin"
+  realmClients: "ttrpg:auth-service,sprint-management:sprint-management-ui"
+
+# Application binary name
+appBinary: "auth-server"
+
+# Health check configuration - temporarily disabled
+livenessProbe: null
+readinessProbe: null
+
+# Resource limits and requests
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Additional environment variables
+env: []
+
+# Additional volumes
+volumes: []
+
+# Additional volume mounts
+volumeMounts: []
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  # minAvailable can be a number or percentage (e.g., 1 or "50%")
+  # For single replica, always uses minAvailable: 1
+  # For multiple replicas, defaults to 50%
+  minAvailable: "50%"
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Database Migration Configuration
+migration:
+  # Enable database migrations before deployment
+  enabled: true
+  
+  # Migration job image (defaults to main application image)
+  image:
+    repository: "ghcr.io/your-org/go-auth"
+    tag: ""  # Defaults to application image tag
+    pullPolicy: "IfNotPresent"
+  
+  # Database connection settings
+  database:
+    host: ""  # Defaults to postgresql.ttrpg-{env}.svc.cluster.local
+    port: "5432"
+    name: ""  # Defaults to .Values.database.name
+  
+  # Job configuration
+  backoffLimit: 3  # Retry up to 3 times on failure
+  ttlSecondsAfterFinished: 86400  # Delete completed jobs after 24 hours
+  
+  # Additional environment variables for migration job
+  env: []
+  
+  # Resource limits for migration job
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  
+  # Additional volumes for migration job
+  volumes: []
+  volumeMounts: []

@@ -1,0 +1,226 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafana.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-application-health
+  namespace: {{ .Values.monitoring.grafana.namespace | default "monitoring" }}
+  labels:
+    grafana_dashboard: "1"
+    environment: {{ .Values.environment }}
+data:
+  application-health.json: |
+    {
+      "dashboard": {
+        "title": "TTRPG Application Health - {{ .Values.environment }}",
+        "tags": ["ttrpg", "{{ .Values.environment }}"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Pod Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(kube_pod_status_phase{namespace=\"ttrpg-{{ .Values.environment }}\"}) by (phase)"
+              }
+            ]
+          },
+          {
+            "title": "HTTP Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (service)"
+              }
+            ]
+          },
+          {
+            "title": "HTTP Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"ttrpg-{{ .Values.environment }}\",status=~\"5..\"}[5m])) by (service)"
+              }
+            ]
+          },
+          {
+            "title": "Response Time (p95)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (le, service))"
+              }
+            ]
+          }
+        ]
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-database-performance
+  namespace: {{ .Values.monitoring.grafana.namespace | default "monitoring" }}
+  labels:
+    grafana_dashboard: "1"
+    environment: {{ .Values.environment }}
+data:
+  database-performance.json: |
+    {
+      "dashboard": {
+        "title": "PostgreSQL Performance - {{ .Values.environment }}",
+        "tags": ["ttrpg", "{{ .Values.environment }}", "database"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Active Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "pg_stat_database_numbackends{namespace=\"ttrpg-{{ .Values.environment }}\"}"
+              }
+            ]
+          },
+          {
+            "title": "Transaction Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_xact_commit{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Query Duration (p95)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(pg_stat_statements_mean_time_seconds_bucket{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (le))"
+              }
+            ]
+          },
+          {
+            "title": "Cache Hit Ratio",
+            "type": "gauge",
+            "targets": [
+              {
+                "expr": "sum(pg_stat_database_blks_hit{namespace=\"ttrpg-{{ .Values.environment }}\"}) / (sum(pg_stat_database_blks_hit{namespace=\"ttrpg-{{ .Values.environment }}\"}) + sum(pg_stat_database_blks_read{namespace=\"ttrpg-{{ .Values.environment }}\"}))"
+              }
+            ]
+          }
+        ]
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-vault-access
+  namespace: {{ .Values.monitoring.grafana.namespace | default "monitoring" }}
+  labels:
+    grafana_dashboard: "1"
+    environment: {{ .Values.environment }}
+data:
+  vault-access.json: |
+    {
+      "dashboard": {
+        "title": "Vault Access Patterns - {{ .Values.environment }}",
+        "tags": ["ttrpg", "{{ .Values.environment }}", "vault"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Secret Access Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vault_core_handle_request_count{namespace=\"vault\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Token Creation Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vault_token_create_count{namespace=\"vault\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Database Credential Generation",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vault_database_credentials_generated{namespace=\"vault\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Vault Seal Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "vault_core_unsealed{namespace=\"vault\"}"
+              }
+            ]
+          }
+        ]
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-ingress-traffic
+  namespace: {{ .Values.monitoring.grafana.namespace | default "monitoring" }}
+  labels:
+    grafana_dashboard: "1"
+    environment: {{ .Values.environment }}
+data:
+  ingress-traffic.json: |
+    {
+      "dashboard": {
+        "title": "Ingress Traffic - {{ .Values.environment }}",
+        "tags": ["ttrpg", "{{ .Values.environment }}", "ingress"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Request Rate by Path",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_ingress_controller_requests{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (path)"
+              }
+            ]
+          },
+          {
+            "title": "Response Status Codes",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_ingress_controller_requests{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (status)"
+              }
+            ]
+          },
+          {
+            "title": "Request Duration (p95)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m])) by (le, path))"
+              }
+            ]
+          },
+          {
+            "title": "Ingress Bandwidth",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(nginx_ingress_controller_request_size_sum{namespace=\"ttrpg-{{ .Values.environment }}\"}[5m]))"
+              }
+            ]
+          }
+        ]
+      }
+    }
+{{- end }}

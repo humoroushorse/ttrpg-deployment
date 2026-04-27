@@ -1,0 +1,615 @@
+# Default values for ttrpg-umbrella
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  # Default version for all applications
+  # This version is used when no application-specific version is set
+  # 
+  # VERSION PRECEDENCE (highest to lowest):
+  # 1. Command-line: --set {app}.image.tag=vX.Y.Z
+  # 2. Application-specific: {app}.version (e.g., go-auth.version)
+  # 3. Global default: global.version
+  # 4. Fallback: "latest"
+  #
+  # SEMANTIC VERSIONING:
+  # - Use semantic version format: vX.Y.Z or X.Y.Z (e.g., v1.2.3 or 1.2.3)
+  # - Special tags: "latest", "dev", "staging" (not recommended for production)
+  #
+  # ENVIRONMENT STRATEGIES:
+  # - local/dev: Use "latest" for automatic updates during development
+  # - prod: Use pinned versions (e.g., "v1.2.3") for stability and reproducibility
+  #
+  # EXAMPLES:
+  # - Deploy all apps with v1.2.3: helm install --set global.version=v1.2.3
+  # - Deploy go-auth with v1.3.0, others with v1.2.3: 
+  #   helm install --set global.version=v1.2.3 --set go-auth.version=v1.3.0
+  # - Override at deploy time:
+  #   helm install --set go-auth.image.tag=v1.3.1
+  version: "latest"
+  # PostgreSQL deployment mode propagated to all sub-charts
+  # "statefulset" for local/dev (single instance), "operator" for prod (Zalando HA)
+  postgresql:
+    mode: "statefulset"
+
+# Environment: local, dev, or prod
+environment: "local"
+
+# Base domain for ingress
+domain: "localhost"
+
+# Sealed Secrets configuration
+sealedSecrets:
+  enabled: true
+  namespace: "kube-system"
+  controllerImage: "quay.io/bitnami/sealed-secrets-controller:latest"
+
+# Pod Security Standards
+podSecurity:
+  enabled: true
+  # Standard for application namespaces: restricted, baseline, or privileged
+  applicationStandard: "restricted"
+  # Standard for infrastructure namespaces (vault, etc)
+  infrastructureStandard: "baseline"
+
+# Certificate Manager
+cert-manager:
+  enabled: true
+  email: "admin@example.com"
+  issuer: "selfsigned"
+  # Issuer: selfsigned (local), letsencrypt-staging, letsencrypt-prod
+  issuer: "selfsigned"
+  # Pass-through values to cert-manager subchart
+  cert-manager:
+    installCRDs: true
+    global:
+      leaderElection:
+        namespace: cert-manager
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+# GitHub Runner (Optional - for future CI/CD)
+githubRunner:
+  enabled: false
+  replicas: 1
+  org: "your-org"
+  repo: "your-repo"
+  labels: "self-hosted,kubernetes"
+  image: "myoung34/github-runner:latest"
+
+# Vault configuration
+vault:
+  enabled: true
+  replicas: 1  # 3 for prod HA
+  storage: "10Gi"  # 50Gi for prod
+  autoUnseal: true  # Only for local/dev
+  unsealKeys: []  # Loaded from sealed secret
+  image:
+    repository: hashicorp/vault
+    tag: "1.15"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # Raft storage for HA (prod only)
+  raft:
+    enabled: false
+    setNodeId: true
+
+# Cloudflare Tunnel
+cloudflare:
+  enabled: false  # Disabled for local
+  tunnelId: ""
+  domain: "mysite.com"
+  # Ingress endpoint - defaults to namespace-local ingress service
+  # For multi-cluster: set to external cluster address
+  ingressEndpoint: ""
+  replicas: 2
+  image:
+    repository: cloudflare/cloudflared
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  # Deployment mode: "statefulset" or "operator"
+  mode: "statefulset"  # Use "operator" for prod with HA
+  storage: "10Gi"
+  replicas: 1  # Only used with operator mode
+  image:
+    repository: postgres
+    tag: "18-alpine"
+    pullPolicy: IfNotPresent
+  # PostgreSQL Operator configuration
+  operator:
+    # Type: "zalando" or "cloudnativepg"
+    type: "zalando"
+    enableConnectionPooler: true
+    enableReplicaConnectionPooler: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  # Databases to create
+  databases:
+    - auth
+    - sprint_management
+    - dnd
+    - keycloak
+
+# Keycloak
+keycloak:
+  enabled: true
+  replicas: 1
+  hostname: "localhost"
+  image:
+    repository: keycloak/keycloak
+    tag: "26.5"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  # Realms to configure
+  realms:
+    - name: dnd
+      clients:
+        - clientId: dnd-client
+          publicClient: true
+          redirectUris:
+            - "http://localhost:8080/ttrpg/dnd/*"
+    - name: sprint-management
+      clients:
+        - clientId: sprint-client
+          publicClient: true
+          redirectUris:
+            - "http://localhost:8080/ttrpg/sprint-management/*"
+
+# NATS
+nats:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: nats
+    tag: "2.12-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  # JetStream configuration
+  jetstream:
+    enabled: false
+    storage: "1Gi"
+
+# Application: go-auth
+go-auth:
+  enabled: true
+  # Application-specific version override
+  # Leave empty ("") to use global.version
+  # Set to specific version (e.g., "v1.2.3") to override global version
+  # This is useful for deploying different versions of individual services
+  version: ""  # Uses global.version if empty
+  replicaCount: 1
+  image:
+    repository: "ghcr.io/your-org/go-auth"
+    pullPolicy: "IfNotPresent"
+    # Image tag override (highest precedence)
+    # Leave empty ("") to use version precedence: version > global.version > "latest"
+    # Set to specific tag to override all other version settings
+    tag: ""  # Uses version or global.version
+  service:
+    type: ClusterIP
+    port: 8081
+  database:
+    name: "auth"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # Health check configuration
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  # Service account
+  serviceAccount:
+    create: true
+    name: ""
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Application: go-sprint
+go-sprint:
+  enabled: true
+  # Application-specific version override (leave empty to use global.version)
+  version: ""
+  replicaCount: 1
+  image:
+    repository: "ghcr.io/your-org/go-sprint"
+    pullPolicy: "IfNotPresent"
+    # Image tag override (highest precedence, leave empty to use version)
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8003
+  database:
+    name: "sprint_management"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8003
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8003
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  serviceAccount:
+    create: true
+    name: ""
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Application: py-dnd
+py-dnd:
+  enabled: true
+  # Application-specific version override (leave empty to use global.version)
+  version: ""
+  replicaCount: 1
+  image:
+    repository: "ghcr.io/your-org/py-dnd"
+    pullPolicy: "IfNotPresent"
+    # Image tag override (highest precedence, leave empty to use version)
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8001
+  database:
+    name: "dnd"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8001
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  serviceAccount:
+    create: true
+    name: ""
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Application: ui-dnd
+ui-dnd:
+  enabled: true
+  # Application-specific version override (leave empty to use global.version)
+  version: ""
+  replicaCount: 1
+  image:
+    repository: "ghcr.io/your-org/ui-dnd"
+    pullPolicy: "IfNotPresent"
+    # Image tag override (highest precedence, leave empty to use version)
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 4200
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 4200
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 4200
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  serviceAccount:
+    create: true
+    name: ""
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101  # nginx user
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Application: ui-sprint-management
+ui-sprint-management:
+  enabled: true
+  # Application-specific version override (leave empty to use global.version)
+  version: ""
+  replicaCount: 1
+  image:
+    repository: "ghcr.io/your-org/ui-sprint-management"
+    pullPolicy: "IfNotPresent"
+    # Image tag override (highest precedence, leave empty to use version)
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 4204
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 4204
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 4204
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  serviceAccount:
+    create: true
+    name: ""
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101  # nginx user
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+# Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+  # Ingress controller configuration
+  controller:
+    enabled: true
+    replicaCount: 1
+    service:
+      type: LoadBalancer  # LoadBalancer for local, ClusterIP for dev/prod
+      ports:
+        http: 80
+        https: 443
+      annotations: {}
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+  tls:
+    enabled: false  # true for prod
+    secretName: "ttrpg-tls"
+  # Keycloak authentication
+  keycloak:
+    enabled: false  # Enable in dev/prod
+  # Path rewrite configuration
+  # rewrite:
+  #   enabled: true
+  #   target: "/$2"
+
+# Resource Quotas
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "2"
+    requests.memory: "4Gi"
+    limits.cpu: "4"
+    limits.memory: "8Gi"
+    persistentvolumeclaims: "10"
+
+# Limit Ranges
+limitRange:
+  enabled: true
+  defaults:
+    cpu: "100m"
+    memory: "128Mi"
+  defaultRequests:
+    cpu: "50m"
+    memory: "64Mi"
+  max:
+    cpu: "2000m"
+    memory: "4Gi"
+  min:
+    cpu: "10m"
+    memory: "16Mi"
+
+# Pod Disruption Budgets
+podDisruptionBudget:
+  enabled: false  # true for prod
+  minAvailable: 1
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false  # true for prod
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Monitoring
+monitoring:
+  enabled: false  # true for prod
+  prometheus:
+    enabled: false
+    scrapeInterval: "30s"
+    scrapeTimeout: "10s"
+    instance: "kube-prometheus"  # Prometheus instance label
+  grafana:
+    enabled: false
+    namespace: "monitoring"  # Namespace where Grafana is deployed
+    dashboards:
+      applicationHealth: true
+      databasePerformance: true
+      vaultAccess: true
+      ingressTraffic: true
+
+# Logging configuration
+logging:
+  # Log format: json or text
+  format: "json"
+  # Log level per environment
+  level:
+    local: "DEBUG"
+    dev: "INFO"
+    prod: "WARN"
+  # Structured logging fields
+  structuredLogging:
+    enabled: true
+    includeTimestamp: true
+    includeLevel: true
+    includeService: true
+    includeEnvironment: true
+    includeTraceId: true
+
+# Backups
+backups:
+  enabled: false  # true for prod
+  schedule: "0 2 * * *"  # 2 AM daily
+  retention: 7  # days (7 for dev, 30 for prod)
+  storage: "50Gi"
+  storageClass: ""  # Use default storage class if empty
+  # Backup destinations
+  destinations:
+    - type: "pvc"
+      name: "backup-storage"
+    # - type: "s3"
+    #   bucket: "ttrpg-backups"
+    #   region: "us-east-1"
+  # Vault backup configuration
+  vault:
+    enabled: false
+    schedule: "0 */6 * * *"  # Every 6 hours
+    retention: 30  # days
+    encryption:
+      enabled: true
+      gpgRecipient: "vault-backup@ttrpg.local"
+
+# Network Policies
+networkPolicy:
+  enabled: false  # true for prod
+  policyTypes:
+    - Ingress
+    - Egress

@@ -1,0 +1,401 @@
+# Local environment overrides
+# Optimized for k3d/k3s local development
+
+global:
+  # Use "latest" for local development to automatically pull newest images
+  version: "latest"
+  postgresql:
+    mode: "statefulset"
+  logging:
+    format: "console"
+    level:
+      local: "debug"
+    structuredLogging:
+      enabled: false
+
+environment: "local"
+domain: "localhost"
+
+# Vault - auto-unseal enabled for convenience
+vault:
+  enabled: true
+  replicas: 1
+  storage: "5Gi"
+  autoUnseal: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  raft:
+    enabled: false
+
+# Cloudflare Tunnel - disabled for local
+cloudflare:
+  enabled: false
+
+# PostgreSQL - single instance
+postgresql:
+  enabled: true
+  mode: "statefulset"
+  storage: "5Gi"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# Keycloak - minimal resources
+keycloak:
+  enabled: true
+  replicas: 1
+  hostname: "localhost"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  realms:
+    - name: dnd
+      clients:
+        - clientId: dnd-client
+          publicClient: true
+          redirectUris:
+            - "http://localhost:8080/ttrpg/dnd/*"
+            - "http://localhost:4200/*"
+    - name: sprint-management
+      clients:
+        - clientId: sprint-client
+          publicClient: true
+          redirectUris:
+            - "http://localhost:8080/ttrpg/sprint-management/*"
+            - "http://localhost:4204/*"
+  livenessProbe: null
+  readinessProbe: null
+
+# NATS - minimal resources
+nats:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "250m"
+      memory: "128Mi"
+
+# Applications - minimal resources, IfNotPresent pull policy
+#
+# Migration Configuration:
+# All backend services (go-auth, go-sprint, py-dnd) support database migrations via Kubernetes Jobs.
+# Migrations run automatically before application deployment using Helm pre-install/pre-upgrade hooks.
+#
+# Configuration Options:
+#   migration.enabled: Enable/disable migration jobs (default: true for production, false for testing)
+#   migration.image: Docker image containing migration files and tools (defaults to application image)
+#   migration.database.host: PostgreSQL host (defaults to cluster-internal DNS)
+#   migration.database.port: PostgreSQL port (default: 5432)
+#   migration.database.name: Database name (defaults to service-specific database)
+#   migration.backoffLimit: Number of retry attempts on failure (default: 3)
+#   migration.ttlSecondsAfterFinished: Time to keep completed jobs before cleanup (default: 3600 for local)
+#   migration.resources: CPU and memory limits for migration job
+#   migration.env: Additional environment variables for migration job
+#
+# Migration Tools:
+#   - go-auth: golang-migrate (command: /app/migrate -action up)
+#   - go-sprint: golang-migrate (command: /app/migrate -action up)
+#   - py-dnd: Alembic (command: alembic upgrade head)
+#
+# Behavior:
+#   - Migrations run before application pods start
+#   - Failed migrations block application deployment
+#   - Successful migrations allow deployment to proceed
+#   - Jobs are idempotent and can be safely re-run
+#   - Credentials are obtained from Vault dynamically
+#
+# Troubleshooting:
+#   - View migration logs: kubectl logs job/<service>-migration -n ttrpg-local
+#   - Check migration status: kubectl get jobs -n ttrpg-local
+#   - Retry failed migration: Delete the job and redeploy
+#
+go-auth:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/go-auth"
+    pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  migration:
+    # Enable database migrations before deployment
+    enabled: true
+    
+    # Migration job image (uses same image as application)
+    image:
+      repository: "localhost:5000/go-auth"
+      pullPolicy: "IfNotPresent"
+      repository: "localhost:5000/go-auth"
+      pullPolicy: "IfNotPresent"
+    
+    # Database connection settings (defaults to cluster-internal DNS)
+    database:
+      host: ""  # Defaults to postgresql.ttrpg-local.svc.cluster.local
+      port: "5432"
+      name: "auth"
+    
+    # Job configuration
+    backoffLimit: 3  # Retry up to 3 times on failure
+    ttlSecondsAfterFinished: 3600  # Delete completed jobs after 1 hour (shorter for local)
+    
+    # Resource limits for migration job (minimal for local)
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "250m"
+        memory: "128Mi"
+    
+    # Additional environment variables for migration job
+    env:
+      - name: LOG_LEVEL
+        value: "debug"
+  livenessProbe: null
+  readinessProbe: null
+
+go-sprint:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/go-sprint"
+    pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  migration:
+    # Enable database migrations before deployment
+    enabled: true
+    
+    # Migration job image (uses same image as application)
+    image:
+      repository: "localhost:5000/go-sprint"
+      pullPolicy: "IfNotPresent"
+    
+    # Database connection settings (defaults to cluster-internal DNS)
+    database:
+      host: ""  # Defaults to postgresql.ttrpg-local.svc.cluster.local
+      port: "5432"
+      name: "sprint_management"
+    
+    # Job configuration
+    backoffLimit: 3  # Retry up to 3 times on failure
+    ttlSecondsAfterFinished: 3600  # Delete completed jobs after 1 hour (shorter for local)
+    
+    # Resource limits for migration job (minimal for local)
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "250m"
+        memory: "128Mi"
+    
+    # Additional environment variables for migration job
+    env:
+      - name: LOG_LEVEL
+        value: "debug"
+  livenessProbe: null
+  readinessProbe: null
+
+py-dnd:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/py-dnd"
+    pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "512Mi"
+  migration:
+    # Enable database migrations before deployment
+    enabled: true
+    
+    # Migration job image (uses same image as application)
+    image:
+      repository: "localhost:5000/py-dnd"
+      pullPolicy: "IfNotPresent"
+    
+    # Database connection settings (defaults to cluster-internal DNS)
+    database:
+      host: ""  # Defaults to postgresql.ttrpg-local.svc.cluster.local
+      port: "5432"
+      name: "dnd"
+    
+    # Job configuration
+    backoffLimit: 3  # Retry up to 3 times on failure
+    ttlSecondsAfterFinished: 3600  # Delete completed jobs after 1 hour (shorter for local)
+    
+    # Resource limits for migration job (minimal for local, slightly higher memory for Python)
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "250m"
+        memory: "256Mi"
+    
+    # Additional environment variables for migration job
+    env:
+      - name: LOG_LEVEL
+        value: "DEBUG"  # Uppercase for loguru
+      - name: PYTHONUNBUFFERED
+        value: "1"  # Ensure logs are flushed immediately
+  livenessProbe: null
+  readinessProbe: null
+  env:
+    - name: LOG_LEVEL
+      value: "DEBUG"  # Override with uppercase for loguru
+
+ui-dnd:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/ui-dnd"
+    pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  livenessProbe: null
+  readinessProbe: null
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false  # Disabled for local dev - nginx needs to write config
+    capabilities:
+      drop:
+        - ALL
+
+ui-sprint-management:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "localhost:5000/ui-sprint-management"
+    pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "32Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  livenessProbe: null
+  readinessProbe: null
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false  # Disabled for local dev - nginx needs to write config
+    capabilities:
+      drop:
+        - ALL
+
+# Ingress - LoadBalancer for local access
+ingress:
+  enabled: true
+  className: "nginx"
+  controller:
+    service:
+      type: LoadBalancer
+  tls:
+    enabled: false
+  keycloak:
+    enabled: false  # Disabled for local development
+
+# Resource Quotas - minimal for local
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "2"
+    requests.memory: "4Gi"
+    limits.cpu: "4"
+    limits.memory: "8Gi"
+    persistentvolumeclaims: "10"
+
+# Limit Ranges - lower limits for local
+limitRange:
+  enabled: true
+  defaults:
+    cpu: "50m"
+    memory: "64Mi"
+  defaultRequests:
+    cpu: "25m"
+    memory: "32Mi"
+  max:
+    cpu: "1000m"
+    memory: "2Gi"
+  min:
+    cpu: "10m"
+    memory: "16Mi"
+
+# Features disabled for local
+podDisruptionBudget:
+  enabled: false
+
+autoscaling:
+  enabled: false
+
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+
+# Logging - text format with DEBUG level for local development
+logging:
+  format: "text"  # Easier to read in terminal
+  level:
+    local: "debug"
+  structuredLogging:
+    enabled: false  # Simpler logs for local dev
+
+backups:
+  enabled: false  # Not needed for local development
+
+networkPolicy:
+  enabled: false
+
+cert-manager:
+  enabled: true
+  issuer: "selfsigned"
+  email: "admin@localhost"
+
+sealedSecrets:
+  enabled: false  # Disabled for local development to speed up deployment
+
+podSecurity:
+  enabled: true
+  applicationStandard: "baseline"  # Relaxed for local dev
+  infrastructureStandard: "baseline"

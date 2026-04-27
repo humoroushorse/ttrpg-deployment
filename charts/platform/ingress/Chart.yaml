@@ -1,0 +1,8 @@
+apiVersion: v2
+name: ingress
+description: Nginx Ingress Controller with path-based routing and Keycloak integration
+type: application
+version: 1.0.0
+appVersion: "1.9.5"
+
+dependencies: []

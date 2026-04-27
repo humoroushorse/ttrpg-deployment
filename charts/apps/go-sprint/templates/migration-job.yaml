@@ -1,0 +1,101 @@
+{{- if .Values.migration.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "go-sprint.fullname" . }}-migration
+  namespace: {{ include "go-sprint.namespace" . }}
+  labels:
+    {{- include "go-sprint.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished | default 86400 }}
+  template:
+    metadata:
+      labels:
+        {{- include "go-sprint.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+      annotations:
+        # Migrations use static credentials (superuser) for DDL operations.
+        # Vault dynamic credentials lack schema-level permissions needed for CREATE TABLE etc.
+        vault.hashicorp.com/agent-inject: "false"
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "go-sprint.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: migration
+        image: "{{ .Values.migration.image.repository }}:{{ .Values.migration.image.tag | default (include "go-sprint.imageTag" .) }}"
+        imagePullPolicy: {{ .Values.migration.image.pullPolicy | default .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # URL-encode a string (handles special chars in passwords)
+            urlencode() {
+              local string="$1"
+              local encoded=""
+              local i c o
+              for i in $(seq 0 $((${#string} - 1))); do
+                c="${string:$i:1}"
+                case "$c" in
+                  [a-zA-Z0-9.~_-]) encoded="${encoded}${c}" ;;
+                  *) o=$(printf '%%%02X' "'$c"); encoded="${encoded}${o}" ;;
+                esac
+              done
+              printf '%s' "$encoded"
+            }
+
+            ENCODED_USER=$(urlencode "${POSTGRES_USER}")
+            ENCODED_PASS=$(urlencode "${POSTGRES_PASSWORD}")
+            export DATABASE_URL="postgres://${ENCODED_USER}:${ENCODED_PASS}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}?sslmode=disable"
+
+            echo "Running migrations..."
+            /app/migrate -db="${DATABASE_URL}" -path=/app/migrations -action=up
+
+            echo "Verifying migration status..."
+            /app/migrate -db="${DATABASE_URL}" -path=/app/migrations -action=version
+        env:
+        - name: DATABASE_HOST
+          value: {{ .Values.migration.database.host | default (.Values.global.postgresql.host | default "platform-postgresql.platform.svc.cluster.local") | quote }}
+        - name: DATABASE_PORT
+          value: {{ .Values.migration.database.port | default "5432" | quote }}
+        - name: DATABASE_NAME
+          value: {{ .Values.migration.database.name | default .Values.database.name | quote }}
+        - name: POSTGRES_USER
+          value: {{ .Values.migration.database.user | default "postgres" | quote }}
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.migration.database.password | default "TEMPORARY_PASSWORD_WILL_BE_ROTATED" | quote }}
+        {{- with .Values.migration.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        {{- with .Values.migration.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.migration.resources | nindent 10 }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      {{- with .Values.migration.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}

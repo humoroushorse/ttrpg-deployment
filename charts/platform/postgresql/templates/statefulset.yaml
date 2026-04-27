@@ -1,0 +1,94 @@
+{{- if and .Values.enabled (eq .Values.mode "statefulset") }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  namespace: {{ include "postgresql.namespace" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "postgresql.fullname" . }}
+  replicas: {{ .Values.statefulset.replicas }}
+  selector:
+    matchLabels:
+      {{- include "postgresql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "postgresql.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: postgresql
+        image: "{{ .Values.statefulset.image.repository }}:{{ .Values.statefulset.image.tag }}"
+        imagePullPolicy: {{ .Values.statefulset.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - name: postgresql
+          containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "TEMPORARY_PASSWORD_WILL_BE_ROTATED"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF8 --locale=en_US.UTF-8"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.statefulset.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: {{ include "postgresql.fullname" . }}-init
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "postgresql.labels" . | nindent 8 }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      {{- if .Values.statefulset.storage.storageClass }}
+      storageClassName: {{ .Values.statefulset.storage.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.statefulset.storage.size }}
+{{- end }}

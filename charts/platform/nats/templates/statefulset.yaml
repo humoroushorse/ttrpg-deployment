@@ -1,0 +1,95 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nats.fullname" . }}
+  namespace: {{ include "nats.namespace" . }}
+  labels:
+    {{- include "nats.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "nats.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nats.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nats.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "nats.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+      - name: nats
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 10 }}
+        command:
+          - nats-server
+          - --config
+          - /etc/nats/nats.conf
+        ports:
+        - name: client
+          containerPort: {{ .Values.service.ports.client }}
+          protocol: TCP
+        - name: monitor
+          containerPort: {{ .Values.service.ports.monitor }}
+          protocol: TCP
+        - name: cluster
+          containerPort: {{ .Values.service.ports.cluster }}
+          protocol: TCP
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nats
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        {{- if .Values.nats.jetstream.enabled }}
+        - name: data
+          mountPath: /data
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "nats.fullname" . }}-config
+      - name: tmp
+        emptyDir: {}
+      {{- if and .Values.nats.jetstream.enabled (not .Values.persistence.enabled) }}
+      - name: data
+        emptyDir: {}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if and .Values.nats.jetstream.enabled .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+        - {{ .Values.persistence.accessMode }}
+      {{- if .Values.persistence.storageClass }}
+      storageClassName: {{ .Values.persistence.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size }}
+  {{- end }}
+{{- end }}

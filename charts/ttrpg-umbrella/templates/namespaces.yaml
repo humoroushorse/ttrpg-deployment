@@ -1,0 +1,15 @@
+{{- if .Values.podSecurity.enabled }}
+---
+# Application namespace with restricted Pod Security Standard
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ttrpg-{{ .Values.environment }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- if .Values.podSecurity.enabled }}
+    pod-security.kubernetes.io/enforce: {{ .Values.podSecurity.applicationStandard }}
+    pod-security.kubernetes.io/audit: {{ .Values.podSecurity.applicationStandard }}
+    pod-security.kubernetes.io/warn: {{ .Values.podSecurity.applicationStandard }}
+    {{- end }}
+{{- end }}

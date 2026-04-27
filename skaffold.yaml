@@ -1,0 +1,321 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: ttrpg-deployment
+
+# Build configuration
+build:
+  # Don't push to remote registry for local development
+  local:
+    push: false
+    useBuildkit: true
+  
+  artifacts:
+    # Go Auth Service
+    - image: go-auth
+      context: ../ttrpg-api/go_auth
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "**/*.go"
+            dest: /build
+            strip: ""
+          - src: "go.mod"
+            dest: /build
+          - src: "go.sum"
+            dest: /build
+    
+    # Go Sprint Service
+    - image: go-sprint
+      context: ../ttrpg-api/go_sprint
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "**/*.go"
+            dest: /build
+            strip: ""
+          - src: "go.mod"
+            dest: /build
+          - src: "go.sum"
+            dest: /build
+    
+    # Python DnD Service
+    - image: py-dnd
+      context: ../ttrpg-api/py_dnd
+      docker:
+        dockerfile: deploy/Dockerfile
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: /tmp
+            strip: ""
+          - src: "pyproject.toml"
+            dest: /tmp
+    
+    # UI DnD Application
+    - image: ui-dnd
+      context: ../ttrpg-ui
+      docker:
+        dockerfile: apps/dnd/deploy/Dockerfile
+      sync:
+        manual:
+          - src: "apps/dnd/src/**/*"
+            dest: /app/apps/dnd/src
+            strip: "apps/dnd/src"
+          - src: "shared/**/*"
+            dest: /app/shared
+            strip: "shared"
+    
+    # UI Sprint Management Application
+    - image: ui-sprint-management
+      context: ../ttrpg-ui
+      docker:
+        dockerfile: apps/sprint-management/deploy/Dockerfile
+      sync:
+        manual:
+          - src: "apps/sprint-management/src/**/*"
+            dest: /app/apps/sprint-management/src
+            strip: "apps/sprint-management/src"
+          - src: "shared/**/*"
+            dest: /app/shared
+            strip: "shared"
+
+# Deployment configuration
+deploy:
+  helm:
+    releases:
+      - name: ttrpg-local
+        chartPath: charts/ttrpg-umbrella
+        valuesFiles:
+          - charts/ttrpg-umbrella/values-local.yaml
+        setValues:
+          go-auth.image.repository: go-auth
+          go-auth.image.tag: latest
+          go-sprint.image.repository: go-sprint
+          go-sprint.image.tag: latest
+          py-dnd.image.repository: py-dnd
+          py-dnd.image.tag: latest
+          ui-dnd.image.repository: ui-dnd
+          ui-dnd.image.tag: latest
+          ui-sprint-management.image.repository: ui-sprint-management
+          ui-sprint-management.image.tag: latest
+        namespace: ttrpg-local
+        createNamespace: true
+        wait: true
+        upgradeOnChange: true
+
+# Port forwarding for local access
+portForward:
+  - resourceType: service
+    resourceName: ingress-nginx-controller
+    namespace: ttrpg-local
+    port: 80
+    localPort: 8080
+  
+  - resourceType: service
+    resourceName: vault
+    namespace: ttrpg-local
+    port: 8200
+    localPort: 8200
+  
+  - resourceType: service
+    resourceName: keycloak
+    namespace: ttrpg-local
+    port: 8080
+    localPort: 8180
+
+# Profiles for different development scenarios
+profiles:
+  # Development profile with file sync enabled
+  - name: dev
+    activation:
+      - command: dev
+    patches:
+      - op: add
+        path: /build/artifacts/0/sync
+        value:
+          manual:
+            - src: "**/*.go"
+              dest: /build
+      - op: add
+        path: /build/artifacts/1/sync
+        value:
+          manual:
+            - src: "**/*.go"
+              dest: /build
+      - op: add
+        path: /build/artifacts/2/sync
+        value:
+          manual:
+            - src: "**/*.py"
+              dest: /tmp
+  
+  # Debug profile with DEBUG environment variables
+  - name: debug
+    patches:
+      - op: add
+        path: /deploy/helm/releases/0/setValues/go-auth.env.LOG_LEVEL
+        value: DEBUG
+      - op: add
+        path: /deploy/helm/releases/0/setValues/go-sprint.env.LOG_LEVEL
+        value: DEBUG
+      - op: add
+        path: /deploy/helm/releases/0/setValues/py-dnd.env.LOG_LEVEL
+        value: DEBUG
+  
+  # Go Auth only profile
+  - name: go-auth-only
+    build:
+      artifacts:
+        - image: go-auth
+          context: ../ttrpg-api/go_auth
+          docker:
+            dockerfile: Dockerfile
+          sync:
+            manual:
+              - src: "**/*.go"
+                dest: /build
+                strip: ""
+    deploy:
+      helm:
+        releases:
+          - name: ttrpg-local
+            chartPath: charts/ttrpg-umbrella
+            valuesFiles:
+              - charts/ttrpg-umbrella/values-local.yaml
+            setValues:
+              go-auth.image.repository: go-auth
+              go-auth.image.tag: latest
+              go-auth.enabled: true
+              go-sprint.enabled: false
+              py-dnd.enabled: false
+              ui-dnd.enabled: false
+              ui-sprint-management.enabled: false
+            namespace: ttrpg-local
+            createNamespace: true
+  
+  # Go Sprint only profile
+  - name: go-sprint-only
+    build:
+      artifacts:
+        - image: go-sprint
+          context: ../ttrpg-api/go_sprint
+          docker:
+            dockerfile: Dockerfile
+          sync:
+            manual:
+              - src: "**/*.go"
+                dest: /build
+                strip: ""
+    deploy:
+      helm:
+        releases:
+          - name: ttrpg-local
+            chartPath: charts/ttrpg-umbrella
+            valuesFiles:
+              - charts/ttrpg-umbrella/values-local.yaml
+            setValues:
+              go-sprint.image.repository: go-sprint
+              go-sprint.image.tag: latest
+              go-auth.enabled: false
+              go-sprint.enabled: true
+              py-dnd.enabled: false
+              ui-dnd.enabled: false
+              ui-sprint-management.enabled: false
+            namespace: ttrpg-local
+            createNamespace: true
+  
+  # Python DnD only profile
+  - name: py-dnd-only
+    build:
+      artifacts:
+        - image: py-dnd
+          context: ../ttrpg-api/py_dnd
+          docker:
+            dockerfile: deploy/Dockerfile
+          sync:
+            manual:
+              - src: "**/*.py"
+                dest: /tmp
+                strip: ""
+    deploy:
+      helm:
+        releases:
+          - name: ttrpg-local
+            chartPath: charts/ttrpg-umbrella
+            valuesFiles:
+              - charts/ttrpg-umbrella/values-local.yaml
+            setValues:
+              py-dnd.image.repository: py-dnd
+              py-dnd.image.tag: latest
+              go-auth.enabled: false
+              go-sprint.enabled: false
+              py-dnd.enabled: true
+              ui-dnd.enabled: false
+              ui-sprint-management.enabled: false
+            namespace: ttrpg-local
+            createNamespace: true
+  
+  # UI DnD only profile
+  - name: ui-dnd-only
+    build:
+      artifacts:
+        - image: ui-dnd
+          context: ../ttrpg-ui
+          docker:
+            dockerfile: apps/dnd/deploy/Dockerfile
+          sync:
+            manual:
+              - src: "apps/dnd/src/**/*"
+                dest: /app/apps/dnd/src
+                strip: "apps/dnd/src"
+    deploy:
+      helm:
+        releases:
+          - name: ttrpg-local
+            chartPath: charts/ttrpg-umbrella
+            valuesFiles:
+              - charts/ttrpg-umbrella/values-local.yaml
+            setValues:
+              ui-dnd.image.repository: ui-dnd
+              ui-dnd.image.tag: latest
+              go-auth.enabled: false
+              go-sprint.enabled: false
+              py-dnd.enabled: false
+              ui-dnd.enabled: true
+              ui-sprint-management.enabled: false
+            namespace: ttrpg-local
+            createNamespace: true
+  
+  # UI Sprint Management only profile
+  - name: ui-sprint-management-only
+    build:
+      artifacts:
+        - image: ui-sprint-management
+          context: ../ttrpg-ui
+          docker:
+            dockerfile: apps/sprint-management/deploy/Dockerfile
+          sync:
+            manual:
+              - src: "apps/sprint-management/src/**/*"
+                dest: /app/apps/sprint-management/src
+                strip: "apps/sprint-management/src"
+    deploy:
+      helm:
+        releases:
+          - name: ttrpg-local
+            chartPath: charts/ttrpg-umbrella
+            valuesFiles:
+              - charts/ttrpg-umbrella/values-local.yaml
+            setValues:
+              ui-sprint-management.image.repository: ui-sprint-management
+              ui-sprint-management.image.tag: latest
+              go-auth.enabled: false
+              go-sprint.enabled: false
+              py-dnd.enabled: false
+              ui-dnd.enabled: false
+              ui-sprint-management.enabled: true
+            namespace: ttrpg-local
+            createNamespace: true

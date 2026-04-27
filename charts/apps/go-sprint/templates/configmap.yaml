@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "go-sprint.fullname" . }}
+  namespace: {{ include "go-sprint.namespace" . }}
+  labels:
+    {{- include "go-sprint.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  APP_NAME: "go-sprint"
+  SERVER_PORT: {{ .Values.service.port | quote }}
+  ENVIRONMENT: {{ .Values.environment | quote }}
+  # Database configuration (credentials come from Vault, URLs built at runtime with URL-encoding)
+  {{- $pgHost := .Values.global.postgresql.host | default "platform-postgresql.platform.svc.cluster.local" }}
+  {{- $pgPort := .Values.global.postgresql.port | default 5432 }}
+  DATABASE_HOST: {{ $pgHost | quote }}
+  DATABASE_PORT: {{ $pgPort | quote }}
+  DATABASE_NAME: {{ .Values.database.name | quote }}
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "TEMPORARY_PASSWORD_WILL_BE_ROTATED"
+  # NATS configuration
+  NATS_URL: {{ .Values.global.nats.url | default "nats://platform-nats-client.platform.svc.cluster.local:4222" | quote }}
+  # Auth configuration
+  AUTH_SERVICE_URL: "http://apps-go-auth.{{ include "go-sprint.namespace" . }}.svc.cluster.local:8081"
+  KEYCLOAK_URL: "http://platform-keycloak.platform.svc.cluster.local:8080"
+  KEYCLOAK_REALM: "sprint-management"
+  KEYCLOAK_CLIENT_ID: "sprint-management-ui"
+  # Logging configuration
+  {{- include "go-sprint.loggingConfig" . | nindent 2 }}

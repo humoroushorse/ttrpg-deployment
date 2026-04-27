@@ -1,0 +1,70 @@
+{{/*
+ExternalName services to proxy cross-namespace from platform to apps namespace.
+Ingress can only reference services in its own namespace, so these act as bridges.
+*/}}
+{{- $appsNamespace := "apps" }}
+
+{{- if .Values.routes.auth.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: apps-go-auth-external
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: apps-go-auth.{{ $appsNamespace }}.svc.cluster.local
+{{- end }}
+---
+{{- if .Values.routes.dndApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: apps-py-dnd-external
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: apps-py-dnd.{{ $appsNamespace }}.svc.cluster.local
+{{- end }}
+---
+{{- if .Values.routes.dndUi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: apps-ui-dnd-external
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: apps-ui-dnd.{{ $appsNamespace }}.svc.cluster.local
+{{- end }}
+---
+{{- if .Values.routes.sprintApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: apps-go-sprint-external
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: apps-go-sprint.{{ $appsNamespace }}.svc.cluster.local
+{{- end }}
+---
+{{- if .Values.routes.sprintUi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: apps-ui-sprint-management-external
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: apps-ui-sprint-management.{{ $appsNamespace }}.svc.cluster.local
+{{- end }}

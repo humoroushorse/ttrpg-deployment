@@ -1,0 +1,59 @@
+{{- if and .Values.ingress.enabled .Values.ingress.keycloak.enabled }}
+{{- if or .Values.routes.sprintApi.enabled .Values.routes.sprintUi.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ttrpg-ingress-sprint
+  namespace: {{ include "ingress.namespace" . }}
+  labels:
+    {{- include "ingress.labels" . | nindent 4 }}
+    app.kubernetes.io/realm: sprint-management
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.issuer | default "selfsigned" }}
+    {{- end }}
+    # Set realm variable for Sprint Management paths
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      set $realm "sprint-management";
+    # Keycloak authentication with sprint-management realm
+    nginx.ingress.kubernetes.io/auth-url: "{{ include "ingress.keycloakUrl" . }}/realms/sprint-management/protocol/openid-connect/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://{{ .Values.domain }}/ttrpg/auth/login?realm=sprint-management"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.domain }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          {{- if .Values.routes.sprintApi.enabled }}
+          # Sprint Management API with sprint-management realm authentication
+          - path: {{ .Values.routes.sprintApi.path }}(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.sprintApi.service }}
+                port:
+                  number: {{ .Values.routes.sprintApi.port }}
+          {{- end }}
+          
+          {{- if .Values.routes.sprintUi.enabled }}
+          # Sprint Management UI with sprint-management realm authentication
+          - path: {{ .Values.routes.sprintUi.path }}(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.routes.sprintUi.service }}
+                port:
+                  number: {{ .Values.routes.sprintUi.port }}
+          {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,154 @@
+TTRPG Application Suite has been deployed!
+
+Environment: {{ .Values.environment }}
+Namespace: {{ include "ttrpg-umbrella.namespace" . }}
+Domain: {{ .Values.domain }}
+
+{{- if .Values.vault.enabled }}
+
+=== Vault ===
+Vault is deployed in the 'vault' namespace.
+
+{{- if .Values.vault.autoUnseal }}
+Vault is configured with auto-unseal (local development mode).
+{{- else }}
+Vault requires manual unsealing. Run:
+  kubectl exec -n vault vault-0 -- vault operator unseal
+{{- end }}
+
+Access Vault:
+  kubectl port-forward -n vault svc/vault 8200:8200
+  export VAULT_ADDR='http://127.0.0.1:8200'
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+
+=== PostgreSQL ===
+PostgreSQL is deployed with the following databases:
+{{- range .Values.postgresql.databases }}
+  - {{ . }}
+{{- end }}
+
+{{- if eq .Values.postgresql.mode "operator" }}
+Mode: PostgreSQL Operator (HA)
+Replicas: {{ .Values.postgresql.replicas }}
+{{- else }}
+Mode: StatefulSet (single instance)
+{{- end }}
+
+Access PostgreSQL:
+  kubectl port-forward -n {{ include "ttrpg-umbrella.namespace" . }} svc/postgresql 5432:5432
+{{- end }}
+
+{{- if .Values.keycloak.enabled }}
+
+=== Keycloak ===
+Keycloak is deployed with the following realms:
+{{- range .Values.keycloak.realms }}
+  - {{ .name }}
+{{- end }}
+
+Access Keycloak Admin Console:
+  kubectl port-forward -n {{ include "ttrpg-umbrella.namespace" . }} svc/keycloak 8180:8080
+  URL: http://localhost:8180
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+=== Ingress ===
+Applications are accessible via ingress at:
+{{- if .Values.cloudflare.enabled }}
+  https://{{ .Values.domain }}/ttrpg/
+{{- else }}
+  http://{{ .Values.domain }}:8080/ttrpg/
+{{- end }}
+
+Routes:
+  - /ttrpg/auth/*                        → go-auth
+  - /ttrpg/dnd/*                         → ui-dnd
+  - /ttrpg/dnd/api/v1/*                  → py-dnd
+  - /ttrpg/sprint-management/*           → ui-sprint-management
+  - /ttrpg/sprint-management/api/v1/*    → go-sprint
+
+{{- if not .Values.cloudflare.enabled }}
+For local access, port-forward the ingress:
+  kubectl port-forward -n {{ include "ttrpg-umbrella.namespace" . }} svc/ingress-nginx 8080:80
+{{- end }}
+{{- end }}
+
+{{- if .Values.cloudflare.enabled }}
+
+=== Cloudflare Tunnel ===
+Cloudflare Tunnel is enabled and routing traffic to:
+  Domain: {{ .Values.cloudflare.domain }}
+  Replicas: {{ .Values.cloudflare.replicas }}
+
+Verify tunnel status:
+  kubectl logs -n {{ include "ttrpg-umbrella.namespace" . }} -l app=cloudflared
+{{- end }}
+
+=== Applications ===
+Enabled applications:
+{{- if index .Values "go-auth" "enabled" }}
+  - go-auth (port {{ index .Values "go-auth" "service" "port" }})
+{{- end }}
+{{- if index .Values "go-sprint" "enabled" }}
+  - go-sprint (port {{ index .Values "go-sprint" "service" "port" }})
+{{- end }}
+{{- if index .Values "py-dnd" "enabled" }}
+  - py-dnd (port {{ index .Values "py-dnd" "service" "port" }})
+{{- end }}
+{{- if index .Values "ui-dnd" "enabled" }}
+  - ui-dnd (port {{ index .Values "ui-dnd" "service" "port" }})
+{{- end }}
+{{- if index .Values "ui-sprint-management" "enabled" }}
+  - ui-sprint-management (port {{ index .Values "ui-sprint-management" "service" "port" }})
+{{- end }}
+
+Check application status:
+  kubectl get pods -n {{ include "ttrpg-umbrella.namespace" . }}
+
+View application logs:
+  kubectl logs -n {{ include "ttrpg-umbrella.namespace" . }} -l app.kubernetes.io/name=<app-name>
+
+{{- if .Values.monitoring.enabled }}
+
+=== Monitoring ===
+{{- if .Values.monitoring.prometheus.enabled }}
+Prometheus is enabled. Access at:
+  kubectl port-forward -n {{ include "ttrpg-umbrella.namespace" . }} svc/prometheus 9090:9090
+{{- end }}
+{{- if .Values.monitoring.grafana.enabled }}
+Grafana is enabled. Access at:
+  kubectl port-forward -n {{ include "ttrpg-umbrella.namespace" . }} svc/grafana 3000:3000
+{{- end }}
+{{- end }}
+
+{{- if .Values.backups.enabled }}
+
+=== Backups ===
+Automated backups are enabled:
+  Schedule: {{ .Values.backups.schedule }}
+  Retention: {{ .Values.backups.retention }} days
+  Storage: {{ .Values.backups.storage }}
+
+View backup jobs:
+  kubectl get cronjobs -n {{ include "ttrpg-umbrella.namespace" . }}
+{{- end }}
+
+=== Next Steps ===
+1. Verify all pods are running:
+   kubectl get pods -n {{ include "ttrpg-umbrella.namespace" . }}
+
+{{- if not .Values.vault.autoUnseal }}
+2. Initialize and unseal Vault (if not already done):
+   kubectl exec -n vault vault-0 -- vault operator init
+   kubectl exec -n vault vault-0 -- vault operator unseal
+{{- end }}
+
+3. Configure Vault database secrets engine:
+   Run the vault configuration scripts in the scripts/ directory
+
+4. Test application access via ingress
+
+For more information, see the README.md file.

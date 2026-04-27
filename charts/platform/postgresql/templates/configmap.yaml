@@ -1,0 +1,31 @@
+{{- if and .Values.enabled (eq .Values.mode "statefulset") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgresql.fullname" . }}-init
+  namespace: {{ include "postgresql.namespace" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  01-create-databases.sql: |
+    -- Create databases for each application
+    {{- range .Values.databases }}
+    CREATE DATABASE {{ . }};
+    {{- end }}
+    
+    -- Create Vault admin user with superuser privileges
+    -- Password will be rotated by Vault automatically
+    CREATE USER {{ .Values.vaultAdmin.username }} WITH SUPERUSER CREATEDB CREATEROLE REPLICATION;
+    
+    -- Grant all privileges on databases to vault_admin
+    {{- range .Values.databases }}
+    GRANT ALL PRIVILEGES ON DATABASE {{ . }} TO {{ $.Values.vaultAdmin.username }};
+    {{- end }}
+    
+    -- Enable necessary extensions
+    {{- range .Values.databases }}
+    \c {{ . }}
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    {{- end }}
+{{- end }}

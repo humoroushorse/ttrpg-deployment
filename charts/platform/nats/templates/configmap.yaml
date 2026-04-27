@@ -1,0 +1,51 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nats.fullname" . }}-config
+  namespace: {{ include "nats.namespace" . }}
+  labels:
+    {{- include "nats.labels" . | nindent 4 }}
+data:
+  nats.conf: |
+    # NATS Server Configuration
+    
+    # Server name
+    server_name: {{ include "nats.fullname" . }}
+    
+    # Client port
+    port: {{ .Values.service.ports.client }}
+    
+    # HTTP monitoring port
+    http_port: {{ .Values.service.ports.monitor }}
+    
+    # Cluster configuration
+    cluster {
+      name: {{ .Values.nats.clusterName }}
+      port: {{ .Values.service.ports.cluster }}
+      
+      # Routes for cluster connectivity
+      routes = [
+        nats://{{ include "nats.fullname" . }}-0.{{ include "nats.fullname" . }}.{{ include "nats.namespace" . }}.svc.cluster.local:{{ .Values.service.ports.cluster }}
+      ]
+    }
+    
+    # Logging options
+    debug: false
+    trace: false
+    logtime: true
+    
+    # Limits
+    max_connections: 1000
+    max_payload: 1048576  # 1MB
+    max_pending: 67108864  # 64MB
+    
+    {{- if .Values.nats.jetstream.enabled }}
+    # JetStream configuration
+    jetstream {
+      store_dir: /data/jetstream
+      max_memory_store: {{ .Values.nats.jetstream.maxMemory }}
+      max_file_store: {{ .Values.nats.jetstream.maxStorage }}
+    }
+    {{- end }}
+{{- end }}

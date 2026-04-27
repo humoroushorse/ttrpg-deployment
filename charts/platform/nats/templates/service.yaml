@@ -1,0 +1,44 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nats.fullname" . }}
+  namespace: {{ include "nats.namespace" . }}
+  labels:
+    {{- include "nats.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+    - port: {{ .Values.service.ports.client }}
+      targetPort: client
+      protocol: TCP
+      name: client
+    - port: {{ .Values.service.ports.monitor }}
+      targetPort: monitor
+      protocol: TCP
+      name: monitor
+    - port: {{ .Values.service.ports.cluster }}
+      targetPort: cluster
+      protocol: TCP
+      name: cluster
+  selector:
+    {{- include "nats.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nats.fullname" . }}-client
+  namespace: {{ include "nats.namespace" . }}
+  labels:
+    {{- include "nats.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.ports.client }}
+      targetPort: client
+      protocol: TCP
+      name: client
+  selector:
+    {{- include "nats.selectorLabels" . | nindent 4 }}
+{{- end }}

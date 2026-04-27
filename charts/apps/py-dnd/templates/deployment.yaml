@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "py-dnd.fullname" . }}
+  namespace: {{ include "py-dnd.namespace" . }}
+  labels:
+    {{- include "py-dnd.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "py-dnd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "py-dnd.vaultAnnotations" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "py-dnd.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "py-dnd.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ include "py-dnd.imageTag" . }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Source Vault secrets if available
+            if [ -f /vault/secrets/database ]; then
+              source /vault/secrets/database
+            fi
+
+            # URL-encode credentials for database URI (Vault passwords may contain special chars)
+            if command -v python3 >/dev/null 2>&1; then
+              export POSTGRES_MASTER_USER=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_MASTER_USER','postgres'), safe=''))")
+              export POSTGRES_MASTER_PASSWORD=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_MASTER_PASSWORD','admin'), safe=''))")
+              export POSTGRES_REPLICA_USER=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_REPLICA_USER', os.environ.get('POSTGRES_MASTER_USER','postgres')), safe=''))")
+              export POSTGRES_REPLICA_PASSWORD=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('POSTGRES_REPLICA_PASSWORD', os.environ.get('POSTGRES_MASTER_PASSWORD','admin')), safe=''))")
+            fi
+
+            exec {{ .Values.appBinary }} {{ join " " .Values.appArgs }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: {{ include "py-dnd.fullname" . }}
+        {{- with .Values.env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        {{- with .Values.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      {{- with .Values.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

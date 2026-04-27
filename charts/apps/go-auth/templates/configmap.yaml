@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "go-auth.fullname" . }}
+  namespace: {{ include "go-auth.namespace" . }}
+  labels:
+    {{- include "go-auth.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  APP_NAME: "go-auth"
+  APP_PORT: {{ .Values.service.port | quote }}
+  ENVIRONMENT: {{ .Values.environment | quote }}
+  # Database configuration (credentials come from Vault, URL built at runtime with URL-encoding)
+  POSTGRES_DB: {{ .Values.database.name | quote }}
+  POSTGRES_HOST: {{ .Values.global.postgresql.host | default "platform-postgresql.platform.svc.cluster.local" | quote }}
+  POSTGRES_PORT: {{ .Values.global.postgresql.port | default 5432 | quote }}
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "TEMPORARY_PASSWORD_WILL_BE_ROTATED"
+  # NATS configuration
+  NATS_URL: {{ .Values.global.nats.url | default "nats://platform-nats-client.platform.svc.cluster.local:4222" | quote }}
+  # Keycloak configuration
+  KEYCLOAK_URL: {{ .Values.keycloak.url | default "http://platform-keycloak.platform.svc.cluster.local:8080" | quote }}
+  KEYCLOAK_DEFAULT_REALM: {{ .Values.keycloak.defaultRealm | default "sprint-management" | quote }}
+  KEYCLOAK_CLIENT_ID: {{ .Values.keycloak.clientId | default "sprint-management-ui" | quote }}
+  KEYCLOAK_CLIENT_SECRET: {{ .Values.keycloak.clientSecret | default "" | quote }}
+  KEYCLOAK_ADMIN_USER: {{ .Values.keycloak.adminUser | default "admin" | quote }}
+  KEYCLOAK_ADMIN_PASS: {{ .Values.keycloak.adminPass | default "admin" | quote }}
+  KEYCLOAK_REALM_CLIENTS: {{ .Values.keycloak.realmClients | default "ttrpg:auth-service,sprint-management:sprint-management-ui" | quote }}
+  # Logging configuration
+  {{- include "go-auth.loggingConfig" . | nindent 2 }}

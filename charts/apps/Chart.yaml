@@ -1,0 +1,27 @@
+apiVersion: v2
+name: apps
+description: TTRPG application services
+type: application
+version: 1.0.0
+
+dependencies:
+  - name: go-auth
+    version: "0.1.0"
+    repository: "file://go-auth"
+    condition: go-auth.enabled
+  - name: go-sprint
+    version: "0.1.0"
+    repository: "file://go-sprint"
+    condition: go-sprint.enabled
+  - name: py-dnd
+    version: "0.1.0"
+    repository: "file://py-dnd"
+    condition: py-dnd.enabled
+  - name: ui-dnd
+    version: "0.1.0"
+    repository: "file://ui-dnd"
+    condition: ui-dnd.enabled
+  - name: ui-sprint-management
+    version: "0.1.0"
+    repository: "file://ui-sprint-management"
+    condition: ui-sprint-management.enabled

@@ -1,0 +1,121 @@
+# Default values for ingress chart
+
+# Ingress controller configuration
+controller:
+  enabled: true
+  image:
+    repository: registry.k8s.io/ingress-nginx/controller
+    tag: "v1.9.5"
+    pullPolicy: IfNotPresent
+  
+  # Service configuration
+  service:
+    type: LoadBalancer  # LoadBalancer for local, ClusterIP for dev/prod with Cloudflare
+    ports:
+      http: 80
+      https: 443
+    annotations: {}
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Replica count
+  replicaCount: 1
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - NET_BIND_SERVICE
+    seccompProfile:
+      type: RuntimeDefault
+
+# Ingress resource configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  
+  # Annotations
+  annotations:
+    # SSL redirect (disabled by default, enabled in prod)
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  
+  # TLS configuration
+  tls:
+    enabled: false
+    secretName: "ttrpg-tls"
+  
+  # Keycloak authentication
+  keycloak:
+    enabled: false  # Enable in prod
+    baseUrl: ""  # Set to keycloak service URL
+    # Auth URL will be constructed per-path with realm variable
+
+# Application routing configuration
+# Services are in the 'apps' namespace, so we use ExternalName services
+# created by this chart to proxy cross-namespace.
+routes:
+  # Auth service
+  auth:
+    enabled: true
+    path: "/ttrpg/auth"
+    service: "apps-go-auth-external"
+    port: 8081
+    stripPrefix: true
+  
+  # D&D UI
+  dndUi:
+    enabled: true
+    path: "/ttrpg/dnd"
+    service: "apps-ui-dnd-external"
+    port: 4200
+    stripPrefix: true
+    realm: "dnd"
+  
+  # D&D API - routed through ui-dnd nginx which handles proxy + path rewrite
+  dndApi:
+    enabled: false
+    path: "/ttrpg/dnd/api/v1"
+    service: "apps-py-dnd-external"
+    port: 8001
+    stripPrefix: true
+    realm: "dnd"
+  
+  # Sprint Management UI
+  sprintUi:
+    enabled: true
+    path: "/ttrpg/sprint-management"
+    service: "apps-ui-sprint-management-external"
+    port: 4204
+    stripPrefix: false
+    realm: "sprint-management"
+  
+  # Sprint Management API - routed through ui-sprint-management Node app which handles proxy + path rewrite
+  sprintApi:
+    enabled: false
+    path: "/ttrpg/sprint-management/api/v1"
+    service: "apps-go-sprint-external"
+    port: 8003
+    stripPrefix: true
+    realm: "sprint-management"
+
+# Environment and domain (inherited from parent)
+environment: "local"
+domain: "localhost"

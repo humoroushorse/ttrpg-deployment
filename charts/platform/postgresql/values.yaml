@@ -1,0 +1,94 @@
+enabled: true
+
+# Deployment mode: "statefulset" or "operator"
+mode: statefulset
+
+# StatefulSet configuration
+statefulset:
+  replicas: 1
+  image:
+    repository: postgres
+    tag: "18-alpine"
+    pullPolicy: IfNotPresent
+  
+  storage:
+    size: 10Gi
+    storageClass: ""  # Use default storage class
+  
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# PostgreSQL Operator configuration (Zalando or CloudNativePG)
+operator:
+  enabled: false
+  type: zalando  # or "cloudnativepg"
+  
+  # Zalando PostgreSQL Operator settings
+  zalando:
+    teamId: ttrpg
+    numberOfInstances: 2
+    enableConnectionPooler: true
+    enableReplicaConnectionPooler: true
+    volume:
+      size: 50Gi
+    
+    postgresql:
+      version: "15"
+      parameters:
+        max_connections: "200"
+        shared_buffers: "256MB"
+    
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  
+  # CloudNativePG settings
+  cloudnativepg:
+    instances: 2
+    storage:
+      size: 50Gi
+    
+    postgresql:
+      parameters:
+        max_connections: "200"
+        shared_buffers: "256MB"
+    
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 5432
+
+# Vault integration
+vault:
+  enabled: true
+  role: postgresql
+  secretPath: "{{env}}/postgres-root/creds"
+
+# Database initialization
+databases:
+  - auth
+  - sprint_management
+  - dnd
+  - keycloak
+
+# Vault admin user (will be created and password rotated by Vault)
+vaultAdmin:
+  username: vault_admin
+  # Password will be managed by Vault with rotate_root_credentials
