@@ -77,6 +77,17 @@ keycloak:
   adminPass: "admin"
   realmClients: "ttrpg:auth-service,sprint-management:sprint-management-ui"
 
+# Cookie configuration
+# IMPORTANT: In production, override 'path' per deployment instance:
+#   - Sprint-management instance: path="/ttrpg/sprint-management"
+#   - TTRPG/DnD instance: path="/ttrpg/dnd"
+# The "/" default is for local development only.
+cookie:
+  path: "/"
+  domain: ""
+  secure: true
+  sameSite: "lax"
+
 # Application binary name
 appBinary: "auth-server"
 

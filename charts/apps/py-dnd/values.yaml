@@ -62,6 +62,16 @@ database:
 appBinary: "python"
 appArgs: ["-m", "uvicorn", "py_dnd.main:app", "--host", "0.0.0.0", "--port", "8001"]
 
+# Cookie configuration
+# IMPORTANT: In production, override 'path' per deployment:
+#   path="/ttrpg/dnd" to scope cookies to the DnD app path.
+# The "/" default is for local development only.
+cookie:
+  path: "/"
+  domain: ""
+  secure: true
+  sameSite: "lax"
+
 # Health check configuration
 # Health check configuration - temporarily disabled
 livenessProbe: null
