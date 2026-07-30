@@ -26,5 +26,10 @@ data:
   KEYCLOAK_ADMIN_USER: {{ .Values.keycloak.adminUser | default "admin" | quote }}
   KEYCLOAK_ADMIN_PASS: {{ .Values.keycloak.adminPass | default "admin" | quote }}
   KEYCLOAK_REALM_CLIENTS: {{ .Values.keycloak.realmClients | default "ttrpg:auth-service,sprint-management:sprint-management-ui" | quote }}
+  # Cookie configuration
+  COOKIE_PATH: {{ .Values.cookie.path | default "/" | quote }}
+  COOKIE_DOMAIN: {{ .Values.cookie.domain | default "" | quote }}
+  COOKIE_SECURE: {{ .Values.cookie.secure | default true | quote }}
+  COOKIE_SAMESITE: {{ .Values.cookie.sameSite | default "lax" | quote }}
   # Logging configuration
   {{- include "go-auth.loggingConfig" . | nindent 2 }}

@@ -33,5 +33,10 @@ data:
   KEYCLOAK_CLIENT_ID: "dnd-client"
   KEYCLOAK_ADMIN_USERNAME: "admin"
   KEYCLOAK_ADMIN_PASSWORD: "admin"
+  # Cookie configuration
+  COOKIE_PATH: {{ .Values.cookie.path | default "/" | quote }}
+  COOKIE_DOMAIN: {{ .Values.cookie.domain | default "" | quote }}
+  COOKIE_SECURE: {{ .Values.cookie.secure | default true | quote }}
+  COOKIE_SAMESITE: {{ .Values.cookie.sameSite | default "lax" | quote }}
   # Logging configuration
   {{- include "py-dnd.loggingConfig" . | nindent 2 }}
